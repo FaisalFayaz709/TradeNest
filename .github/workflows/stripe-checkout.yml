@@ -1,0 +1,31 @@
+name: Payments Stripe Checkout Source Gates
+on:
+  push:
+    paths:
+      - 'apps/api/src/modules/payments/**'
+      - 'apps/api/test/unit/stripe-checkout.provider.spec.ts'
+      - 'apps/web/app/orders/**'
+      - 'packages/config/src/api-env.ts'
+      - 'packages/contracts/src/payments/**'
+      - 'scripts/verify-payments.mjs'
+      - 'scripts/tests/payments-gateway-core.test.mjs'
+      - 'SPEC_LOCK.yaml'
+      - '.github/workflows/stripe-checkout.yml'
+  pull_request:
+  workflow_dispatch:
+jobs:
+  payments-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Lock, API and Stripe source checks
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-api-contracts.mjs
+          node scripts/verify-payments.mjs
+          node --experimental-strip-types --test scripts/tests/payments-gateway-core.test.mjs
+      - name: Source checks do not imply live payment acceptance
+        run: echo 'Test-mode Stripe connectivity, real webhook delivery and financial reconciliation require independent acceptance.'

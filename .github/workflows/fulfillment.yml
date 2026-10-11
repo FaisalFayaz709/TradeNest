@@ -1,0 +1,25 @@
+name: TradeNest Fulfillment - Fulfillment Invariants
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify locked architecture, blueprint endpoints and migration history
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-api-contracts.mjs
+          node scripts/verify-database-migration-chain.mjs
+      - name: Execute Fulfillment source and dependency-free behavior gates
+        run: |
+          node scripts/verify-fulfillment.mjs
+          node --experimental-strip-types --test scripts/tests/fulfillment-invariants.test.mjs
+      - name: Full runtime signoff is required separately
+        run: echo 'Source gates are not PostgreSQL 18, NestJS, Playwright or Stripe runtime acceptance.'

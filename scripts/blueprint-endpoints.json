@@ -1,0 +1,566 @@
+{
+  "source": "TradeNest Technical Blueprint section 5; 74 unique endpoints (admin dispute resolve listed in both sections 5.7/5.8)",
+  "basePath": "/api/v1",
+  "required": [
+    {
+      "method": "GET",
+      "path": "/admin/dashboard",
+      "access": "ADMIN",
+      "roles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/admin/disputes/:id/resolve",
+      "access": "ADMIN",
+      "roles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/escrows",
+      "access": "ADMIN",
+      "roles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/fraud-alerts",
+      "access": "ADMIN",
+      "roles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/payments",
+      "access": "ADMIN",
+      "roles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/admin/users",
+      "access": "ADMIN",
+      "roles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ai/recommendations",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ai/recommendations/products/:id",
+      "access": "PUBLIC",
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/auth/change-password",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "access": "PUBLIC",
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout-all",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/auth/me",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/auth/refresh",
+      "access": "PUBLIC",
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/auth/register",
+      "access": "PUBLIC",
+      "roles": []
+    },
+    {
+      "method": "DELETE",
+      "path": "/cart",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/cart",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/cart/items",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/cart/items/:itemId",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/cart/items/:itemId",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/categories",
+      "access": "PUBLIC",
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/categories",
+      "access": "AUTH",
+      "roles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/categories/:id",
+      "access": "AUTH",
+      "roles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/checkout",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/checkout/quote",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/disputes/:id",
+      "access": "AUTH",
+      "roles": [
+        "BUYER",
+        "SELLER",
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/disputes/:id/evidence",
+      "access": "AUTH",
+      "roles": [
+        "BUYER",
+        "SELLER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/disputes/:id/messages",
+      "access": "AUTH",
+      "roles": [
+        "BUYER",
+        "SELLER",
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/escrows/:id/refund",
+      "access": "AUTH",
+      "roles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/escrows/:id/release",
+      "access": "AUTH",
+      "roles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/events",
+      "access": "OPTIONAL",
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/orders",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/orders/:id",
+      "access": "AUTH",
+      "roles": [
+        "BUYER",
+        "SELLER",
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/orders/:id/cancel",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/orders/:id/confirm-delivery",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/orders/:id/disputes",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/orders/:id/escrow",
+      "access": "AUTH",
+      "roles": [
+        "BUYER",
+        "SELLER",
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/orders/:id/shipment",
+      "access": "AUTH",
+      "roles": [
+        "BUYER",
+        "SELLER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/orders/:id/shipment",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/orders/:orderId/payments",
+      "access": "AUTH",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/orders/:orderId/reviews",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/payments/:id",
+      "access": "AUTH",
+      "roles": [
+        "BUYER",
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/payments/webhooks/:provider",
+      "access": "WEBHOOK",
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/products",
+      "access": "PUBLIC",
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/products",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/products/:id",
+      "access": "SELLER",
+      "roles": [
+        "SELLER",
+        "ADMIN"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/products/:id",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/products/:id/archive",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/products/:id/images",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/products/:id/inventory",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/products/:id/publish",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/products/:id/reviews",
+      "access": "PUBLIC",
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/products/:slug",
+      "access": "PUBLIC",
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/seller/ai-insights",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/seller/analytics",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/seller/analytics/overview",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/seller/analytics/revenue",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/seller/dashboard",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/seller/onboard",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/seller/orders",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/seller/products",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/seller/products/:id/price-suggestion",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/seller/profile",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/seller/profile",
+      "access": "SELLER",
+      "roles": [
+        "SELLER"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/users/me",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/users/me",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "PATCH",
+      "path": "/users/me",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/addresses",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "POST",
+      "path": "/users/me/addresses",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "DELETE",
+      "path": "/users/me/addresses/:addressId",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "PATCH",
+      "path": "/users/me/addresses/:addressId",
+      "access": "AUTH",
+      "roles": []
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/wishlist/:productId",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/wishlist/:productId",
+      "access": "BUYER",
+      "roles": [
+        "BUYER"
+      ]
+    }
+  ]
+}

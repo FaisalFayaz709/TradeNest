@@ -1,0 +1,25 @@
+name: TradeNest Financial reconciliation - Durable Financial Source Checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  financial reconciliation-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify locked module architecture and all required API routes
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-api-contracts.mjs
+          node scripts/verify-database-migration-chain.mjs
+      - name: Verify durable financial workflow and crash safety policies
+        run: |
+          node scripts/verify-financial-reconciliation.mjs
+          node --experimental-strip-types --test scripts/tests/financial-reconciliation-invariants.test.mjs
+      - name: No production approval from source checks alone
+        run: echo 'Node 24 dependency install, PostgreSQL 18, Jest, test-mode Stripe and operational acceptance are separate mandatory gates.'

@@ -1,0 +1,41 @@
+name: TradeNest Foundation - Locked Foundation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  locked-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Isolated/local-only CI database, not staging or production.
+      DATABASE_URL: postgresql://tradenest:tradenest_local_only@127.0.0.1:5432/tradenest?schema=public
+      NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:4000/api/v1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require the reviewed shared lockfile
+        run: |
+          if [ ! -s pnpm-lock.yaml ]; then
+            echo "pnpm-lock.yaml is missing. Generate it under Node 24/pnpm 10.15.1, review, and commit it." >&2
+            exit 1
+          fi
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Python AI test dependencies
+        run: |
+          python -m pip install -r services/ai/requirements.lock
+          python -m pip install 'pytest>=8,<9'
+      - name: Run fail-closed Foundation acceptance
+        run: pnpm acceptance:foundation

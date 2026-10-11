@@ -1,0 +1,38 @@
+name: TradeNest Api contracts - API and Auth Contract Verification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  api-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: postgresql://tradenest:tradenest_local_only@127.0.0.1:5432/tradenest_test?schema=public
+      TEST_DATABASE_URL: postgresql://tradenest:tradenest_local_only@127.0.0.1:5432/tradenest_test?schema=public
+      NODE_ENV: test
+      JWT_ACCESS_SECRET: api contracts-ci-jwt-test-secret-at-least-32-characters
+      PAYMENT_SANDBOX_WEBHOOK_SECRET: api contracts-ci-webhook-test-secret-at-least-32-characters
+      CATALOG_DEFAULT_CURRENCY: USD
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Fail if real reviewed lockfile is missing
+        run: test -s pnpm-lock.yaml || { echo 'Foundation lockfile is still missing. Generate it from real registry.' >&2; exit 1; }
+      - name: Dependency-free static Api contracts checks
+        run: node scripts/verify-api-contracts.mjs && node --test scripts/tests/api-contracts-guards.test.mjs
+      - name: Complete live Api contracts acceptance
+        run: pnpm acceptance:api-contracts

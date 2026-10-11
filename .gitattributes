@@ -1,0 +1,4 @@
+*.pdf binary
+
+# Preserve the checksum-protected historical migration unchanged
+apps/api/prisma/migrations/202610050001_database_foundation/migration.sql -whitespace

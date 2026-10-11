@@ -1,0 +1,25 @@
+name: TradeNest Notifications - Notifications Source Gates
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Locked architecture, APIs and historical migration chain
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-api-contracts.mjs
+          node scripts/verify-database-migration-chain.mjs
+      - name: Notifications notification and ownership checks
+        run: |
+          node scripts/verify-notifications.mjs
+          node --test scripts/tests/notifications-notification-guards.test.mjs
+      - name: Live acceptance is still required
+        run: echo 'PostgreSQL 18 migrations, Node 24/pnpm build, Jest and Playwright must run for release approval.'

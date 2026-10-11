@@ -1,0 +1,96 @@
+{
+  "name": "@tradenest/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./admin": {
+      "types": "./dist/admin/index.d.ts",
+      "import": "./dist/admin/index.js"
+    },
+    "./ai": {
+      "types": "./dist/ai/index.d.ts",
+      "import": "./dist/ai/index.js"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "import": "./dist/auth/index.js"
+    },
+    "./cart": {
+      "types": "./dist/cart/index.d.ts",
+      "import": "./dist/cart/index.js"
+    },
+    "./checkout": {
+      "types": "./dist/checkout/index.d.ts",
+      "import": "./dist/checkout/index.js"
+    },
+    "./common": {
+      "types": "./dist/common/index.d.ts",
+      "import": "./dist/common/index.js"
+    },
+    "./disputes": {
+      "types": "./dist/disputes/index.d.ts",
+      "import": "./dist/disputes/index.js"
+    },
+    "./orders": {
+      "types": "./dist/orders/index.d.ts",
+      "import": "./dist/orders/index.js"
+    },
+    "./payments": {
+      "types": "./dist/payments/index.d.ts",
+      "import": "./dist/payments/index.js"
+    },
+    "./products": {
+      "types": "./dist/products/index.d.ts",
+      "import": "./dist/products/index.js"
+    },
+    "./seller": {
+      "types": "./dist/seller/index.d.ts",
+      "import": "./dist/seller/index.js"
+    },
+    "./users": {
+      "types": "./dist/users/index.d.ts",
+      "import": "./dist/users/index.js"
+    },
+    "./escrow": {
+      "types": "./dist/escrow/index.d.ts",
+      "import": "./dist/escrow/index.js"
+    },
+    "./shipping": {
+      "types": "./dist/shipping/index.d.ts",
+      "import": "./dist/shipping/index.js"
+    },
+    "./reviews": {
+      "types": "./dist/reviews/index.d.ts",
+      "import": "./dist/reviews/index.js"
+    },
+    "./wishlist": {
+      "types": "./dist/wishlist/index.d.ts",
+      "import": "./dist/wishlist/index.js"
+    },
+    "./analytics": {
+      "types": "./dist/analytics/index.d.ts",
+      "import": "./dist/analytics/index.js"
+    },
+    "./notifications": {
+      "types": "./dist/notifications/index.d.ts",
+      "import": "./dist/notifications/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

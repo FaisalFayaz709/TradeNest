@@ -1,0 +1,167 @@
+# TradeNest machine-readable architecture/specification lock.
+# Source: TradeNest Technical Blueprint, especially §§2–3, 5, 7–12, 16–17.
+# This is a guardrail summary; the blueprint remains the authoritative source.
+
+version: 1
+project: TradeNest
+source_document: "TradeNest Technical Blueprint"
+contract_status: locked
+
+classification:
+  locked: "Explicitly required by the blueprint. Must not be changed by ordinary implementation decisions."
+  implementation_decision: "Not fully specified by the blueprint; must remain compatible with all locked requirements."
+  forbidden: "Contradicts the blueprint."
+
+stack:
+  frontend:
+    framework: "Next.js 16"
+    library: "React"
+    language: "TypeScript"
+    status: locked
+  styling_ui:
+    css: "Tailwind CSS"
+    components: "shadcn/ui"
+    status: locked
+  core_backend:
+    runtime: "Node.js 24 LTS"
+    framework: "NestJS"
+    language: "TypeScript"
+    status: locked
+  architecture:
+    pattern: "modular monolith"
+    status: locked
+  api:
+    style: "REST"
+    documentation: "OpenAPI/Swagger"
+    base_path: "/api/v1"
+    status: locked
+  validation_contracts:
+    library: "Zod 4"
+    status: locked
+  database:
+    engine: "PostgreSQL 18"
+    status: locked
+  orm:
+    product: "Prisma ORM 7"
+    status: locked
+  authentication:
+    access_tokens: "JWT"
+    refresh: "refresh sessions"
+    password_hashing: "bcrypt"
+    status: locked
+  authorization:
+    model:
+      - "RBAC"
+      - "resource ownership checks"
+      - "domain/policy checks"
+    status: locked
+  ai_service:
+    language: "Python"
+    framework: "FastAPI"
+    browser_exposure: false
+    status: locked
+  ml_data:
+    libraries:
+      - "scikit-learn"
+      - "pandas"
+      - "NumPy"
+    status: locked
+  storage:
+    allowed:
+      - "S3-compatible object storage"
+      - "Cloudinary"
+    selection_status: implementation_decision
+  testing:
+    backend: "Jest"
+    e2e: "Playwright"
+    ai: "pytest"
+    status: locked
+  development:
+    package_manager: "pnpm"
+    vcs: "Git/GitHub"
+    local_orchestration: "Docker Compose"
+    status: locked
+
+architecture_boundaries:
+  nextjs:
+    owns:
+      - "user experience"
+    must_not_own:
+      - "authoritative business state"
+      - "authoritative financial state"
+  nestjs:
+    owns:
+      - "business rules"
+      - "financial rules"
+      - "public marketplace API"
+  postgresql:
+    owns:
+      - "durable transactional state"
+      - "final integrity boundary"
+  fastapi:
+    owns:
+      - "machine-learning workloads"
+    public_browser_api: false
+  zod:
+    owns:
+      - "TypeScript application-boundary validation"
+
+modular_monolith_rules:
+  one_nestjs_deployable: true
+  one_postgresql_database: true
+  controller_direct_prisma_access: forbidden
+  cross_module_arbitrary_record_mutation: forbidden
+  modules_communicate_via_explicit_services_or_interfaces: required
+  premature_core_microservices_split: forbidden
+
+financial_integrity:
+  client_authoritative_financial_state: forbidden
+  client_declares_payment_success: forbidden
+  payment_success_source: "verified payment-provider state + backend logic"
+  backend_calculates_prices_and_totals: required
+  financial_writes_idempotent: required
+  financial_transitions_transactional: required
+  sensitive_financial_actions_audited: required
+  ordinary_js_floating_point_for_authoritative_money: forbidden
+  acceptable_money_representation:
+    - "PostgreSQL NUMERIC"
+    - "consistent integer minor units"
+
+state_machine_rules:
+  order_payment_escrow_are_separate: true
+  arbitrary_client_status_patch: forbidden
+  command_style_transitions: required
+  invalid_transition_error:
+    http_status: 409
+    code: "INVALID_STATE_TRANSITION"
+
+mvp_scope:
+  checkout:
+    sellers_per_order: 1
+    status: locked_recommendation_for_mvp
+  multi_seller_future:
+    model: "parent order + seller sub-orders"
+
+ai_rules:
+  transaction_path_before_advanced_ai: required
+  pricing_suggestion_may_silently_change_price: false
+  high_fraud_risk_default_behavior: "review rather than automatic accusation"
+  recommendation_service_browser_direct_access: false
+
+implementation_decisions_not_locked:
+  - "exact payment provider"
+  - "S3-compatible provider vs Cloudinary"
+  - "cloud host"
+  - "tax rules"
+  - "shipping price calculation"
+  - "discount/promotion rules"
+  - "shipping carrier integration"
+  - "automatic escrow-release timing"
+  - "dispute opening deadline"
+  - "seller verification/KYC process"
+  - "email/SMS/push provider"
+  - "exact rate limits"
+  - "observability vendor"
+  - "fraud thresholds"
+  - "exact recommendation algorithm beyond the staged MVP direction"
+  - "production deployment topology"

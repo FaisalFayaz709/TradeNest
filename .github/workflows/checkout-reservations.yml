@@ -1,0 +1,31 @@
+name: Checkout Checkout Reservation Source Gates
+on:
+  push:
+    paths:
+      - 'apps/api/src/modules/orders/**'
+      - 'apps/api/src/modules/payments/**'
+      - 'apps/api/prisma/**'
+      - 'scripts/verify-checkout.mjs'
+      - 'scripts/tests/checkout-guards.test.mjs'
+      - 'scripts/verify-architecture.mjs'
+      - 'SPEC_LOCK.yaml'
+      - '.github/workflows/checkout-reservations.yml'
+  pull_request:
+  workflow_dispatch:
+jobs:
+  source-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Locked architecture and migrations
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-database-migration-chain.mjs
+          node scripts/verify-api-contracts.mjs
+          node scripts/verify-checkout.mjs
+          node --test scripts/tests/checkout-guards.test.mjs
+      - name: Live checkout acceptance not implied
+        run: echo 'A green source gate does not prove live PostgreSQL 18 checkout or payment concurrency tests.'

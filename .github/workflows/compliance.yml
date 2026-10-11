@@ -1,0 +1,60 @@
+name: TradeNest Payment compliance - Frozen Lockfile and Compliance
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  locked-build-and-unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: tradenest
+          POSTGRES_PASSWORD: tradenest_ci_password
+          POSTGRES_DB: tradenest_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tradenest -d tradenest_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://tradenest:tradenest_ci_password@localhost:5432/tradenest_ci
+      NODE_ENV: test
+      JWT_ACCESS_SECRET: ci-secret-with-at-least-32-random-characters
+      PAYMENT_SANDBOX_WEBHOOK_SECRET: ci-sandbox-secret-with-at-least-32-characters
+      CATALOG_DEFAULT_CURRENCY: USD
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install exact reviewed dependency graph (fails if genuine lockfile is absent)
+        run: pnpm install --frozen-lockfile
+      - name: Verify locked architecture and remediation regressions
+        run: |
+          pnpm verify:architecture
+          pnpm verify:payment-compliance
+          pnpm verify:api-contracts
+      - name: Prisma database validation and migrations
+        run: |
+          pnpm db:validate
+          pnpm db:migrate:deploy
+      - name: Typecheck, lint and full workspace builds
+        run: |
+          pnpm typecheck
+          pnpm lint
+          pnpm build
+      - name: Backend/AI suites and integration
+        run: |
+          pnpm test:api:unit
+          pnpm test:api:integration
+          pnpm test:ai
+# Production release still additionally requires live S3/Stripe and full Playwright
+# acceptance via pnpm acceptance:payment-compliance with the required external test environment.

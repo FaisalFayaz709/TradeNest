@@ -1,0 +1,35 @@
+name: Storage Managed Storage Source Gates
+on:
+  push:
+    paths:
+      - 'apps/api/src/common/storage/**'
+      - 'apps/api/src/modules/catalog/**'
+      - 'apps/api/src/modules/disputes/**'
+      - 'apps/web/**'
+      - 'apps/api/prisma/**'
+      - 'scripts/verify-storage.mjs'
+      - 'scripts/tests/storage-guards.test.mjs'
+      - 'scripts/verify-api-contracts.mjs'
+      - 'SPEC_LOCK.yaml'
+      - '.github/workflows/managed-storage.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  source-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Architecture / migration / API / storage source gates
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-database-migration-chain.mjs
+          node scripts/verify-api-contracts.mjs
+          node --test scripts/tests/api-contracts-guards.test.mjs
+          node scripts/verify-storage.mjs
+          node --test scripts/tests/storage-guards.test.mjs
+      - name: Live storage acceptance is separately required
+        run: echo 'A green source gate does not certify the S3, PostgreSQL, or Playwright runtime.'

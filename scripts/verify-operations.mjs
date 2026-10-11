@@ -1,0 +1,28 @@
+/** Offline structural invariants; live acceptance is separate and fail closed. */
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url));
+const source = (path) => readFileSync(resolve(root, path), 'utf8');
+const checks = [];
+const check = (description, ok) => { checks.push([description, ok]); if (!ok) console.error(`FAIL ${description}`); };
+const compose = source('docker-compose.deploy.yml');
+const envSample = source('infrastructure/docker/deploy.env.example');
+const backup = source('scripts/ops-backup.mjs');
+const restore = source('scripts/ops-restore-drill.mjs');
+const release = source('scripts/accept-operations.mjs');
+const manifest = JSON.parse(source('package.json'));
+check('locked Node.js 24 and pnpm 10.15.1', manifest.engines.node === '>=24.0.0 <25' && manifest.packageManager === 'pnpm@10.15.1');
+check('PostgreSQL 18, private DB/AI and one NestJS monolith', compose.includes('image: postgres:18') && !/postgres:[\s\S]*?ports:/.test(compose.split('  migrate:')[0]) && !/  ai:[\s\S]*?ports:/.test(compose.split('  api:')[0]) && compose.includes('dockerfile: infrastructure/docker/api.Dockerfile'));
+check('migrations finish before API startup', /migrate:\s*\n\s*condition: service_completed_successfully/.test(compose));
+check('no stray Markdown inside deploy env template', envSample.split(/\r?\n/).every(line => !line.trim() || /^\s*#/.test(line) || /^[A-Z][A-Z0-9_]*=/.test(line)));
+check('backup is streamed and checksummed with restrictive permissions', backup.includes('pipeline(child.stdout') && backup.includes("createHash('sha256')") && backup.includes('mode: 0o600'));
+check('restore refuses existing and primary database', restore.includes('already exists; refuse to overwrite') && restore.includes('target === config.database') && restore.includes('_recovery'));
+check('restore checksum and transactional recovery', restore.includes("createHash('sha256')") && restore.includes('--single-transaction') && restore.includes('--exit-on-error'));
+check('monitoring checks readiness and rejects remote HTTP', source('scripts/ops-health-check.mjs').includes("url.protocol !== 'https:'") && source('scripts/ops-health-check.mjs').includes('/api/v1/health/ready'));
+check('release gate requires backup and isolated restore drill', release.includes('ops-backup.mjs') && release.includes('ops-restore-drill.mjs') && release.includes('accept-security.mjs') && release.includes("endsWith('_staging')"));
+check('lockfile fail-closed deployment preflight retained', source('scripts/deployment-preflight.mjs').includes('pnpm-lock.yaml') && source('scripts/deployment-preflight.mjs').includes('nodeMajor !== 24'));
+check('manual operations runbook and CI exist', existsSync(resolve(root, 'docs/operations-runbook.md')) && existsSync(resolve(root, '.github/workflows/release-operations.yml')));
+for (const [label, ok] of checks) if (ok) console.log(`PASS ${label}`);
+console.log(`Operations offline source invariants: ${checks.filter(([, ok]) => ok).length}/${checks.length}`);
+if (checks.some(([, ok]) => !ok)) process.exitCode = 1;

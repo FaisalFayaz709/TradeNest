@@ -1,0 +1,103 @@
+name: TradeNest Security - Locked Security and Full-stack CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Immutable architecture and API contract verification
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-api-contracts.mjs
+          node scripts/verify-database-migration-chain.mjs
+      - name: Negative security and regression checks
+        run: |
+          node scripts/verify-security.mjs
+          node --experimental-strip-types --test scripts/tests/*.test.mjs
+  locked-full-stack:
+    needs: source-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: tradenest
+          POSTGRES_PASSWORD: tradenest_ci_password
+          POSTGRES_DB: tradenest_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tradenest -d tradenest_test"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://tradenest:tradenest_ci_password@127.0.0.1:5432/tradenest_test
+      TEST_DATABASE_URL: postgresql://tradenest:tradenest_ci_password@127.0.0.1:5432/tradenest_test
+      E2E_DATABASE_URL: postgresql://tradenest:tradenest_ci_password@127.0.0.1:5432/tradenest_e2e
+      E2E_SHARED_PASSWORD: TradeNest-E2E-Only-2026!
+      NODE_ENV: test
+      JWT_ACCESS_SECRET: ci-secret-with-at-least-32-random-characters
+      PAYMENT_SANDBOX_WEBHOOK_SECRET: ci-sandbox-secret-with-at-least-32-characters
+      CATALOG_DEFAULT_CURRENCY: USD
+      PAYMENT_PROVIDER: sandbox
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reproducible frozen installation (missing lockfile is a hard failure)
+        run: |
+          test -s pnpm-lock.yaml
+          pnpm install --frozen-lockfile
+      - name: Prisma schema and clean database migration
+        run: |
+          pnpm db:validate
+          pnpm db:migrate:deploy
+          node scripts/create-security-test-database.mjs
+      - name: Full workspace typecheck, lint, build
+        run: |
+          pnpm typecheck
+          pnpm lint
+          pnpm build
+      - name: NestJS unit and PostgreSQL integration suites
+        run: |
+          pnpm test:api:unit
+          pnpm test:api:integration
+      - name: Pinned AI runtime and pytest
+        run: |
+          python -m pip install -r services/ai/requirements.lock
+          python -m pip install 'pytest>=8,<9' 'httpx>=0.27,<1'
+          PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider services/ai/tests
+      - name: Install Playwright Chromium and dependencies
+        run: pnpm --filter @tradenest/web exec playwright install --with-deps chromium
+      - name: Browser-based Buyer, Seller, Admin and security tests
+        run: pnpm test:e2e
+      - name: Collect browser debugging artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-playwright-results
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          if-no-files-found: ignore
+# This workflow is a mandatory baseline CI gate, NOT payment-provider/S3
+# release acceptance. Full Security acceptance requires pnpm acceptance:security
+# with signed Stripe test webhooks, actual S3 test bucket and other Payment compliance gates.

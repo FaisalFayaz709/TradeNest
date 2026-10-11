@@ -1,0 +1,32 @@
+name: TradeNest Financial remediation - Genuine pnpm Lockfile Bootstrap
+# Manual-only bootstrap: NO automatic commits or unreviewed lockfile changes.
+on:
+  workflow_dispatch:
+jobs:
+  generate-lockfile-for-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Generate genuine lockfile from current package manifests
+        run: |
+          node scripts/verify-foundation-environment.mjs --toolchain-only
+          pnpm install --lockfile-only
+          test -s pnpm-lock.yaml
+          pnpm install --frozen-lockfile
+      - name: Upload authentic lockfile to review and commit manually
+        uses: actions/upload-artifact@v4
+        with:
+          name: tradenest-genuine-pnpm-lockfile
+          path: pnpm-lock.yaml
+          retention-days: 7
+          if-no-files-found: error

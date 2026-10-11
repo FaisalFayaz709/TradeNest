@@ -1,0 +1,60 @@
+# Node
+node_modules/
+.next/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local tooling
+.DS_Store
+.idea/
+.vscode/
+
+# Runtime
+*.log
+
+# Docker/PostgreSQL local state
+.pgdata/
+
+# Prisma generated client (regenerate with pnpm db:generate)
+apps/api/generated/prisma/
+
+# Playwright
+playwright-report/
+test-results/
+
+# Deployment secrets
+infrastructure/docker/deploy.env
+
+# Sensitive disaster-recovery archives / artifacts (never commit)
+.tradenest-backups/
+*.dump
+*.dump.manifest.json
+*.recovery-evidence.json
+
+# Local development backups
+*.bak
+*.bak.*
+
+# Generated Python package metadata
+*.egg-info/
+
+# Locally installed Prisma AI agent skills
+apps/api/.agents/
+apps/api/.claude/
+apps/api/.windsurf/
+apps/api/skills-lock.json
+
+# Temporary troubleshooting scripts
+/tradenest_fix_*.py

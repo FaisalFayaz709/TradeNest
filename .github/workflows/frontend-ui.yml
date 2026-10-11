@@ -1,0 +1,25 @@
+name: TradeNest Frontend - Frontend Integration Gates
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  frontend-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify locked architecture and API route boundaries
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-api-contracts.mjs
+          node scripts/verify-database-migration-chain.mjs
+      - name: Verify frontend routing, security, and display behavior
+        run: |
+          node scripts/verify-frontend.mjs
+          node --experimental-strip-types --test scripts/tests/frontend-integration.test.mjs
+      - name: Explain mandatory separate live acceptance
+        run: echo 'Complete pnpm acceptance:frontend with a genuine frozen lockfile, live PostgreSQL 18, S3-compatible test storage, and Playwright browsers. Static success is not release approval.'

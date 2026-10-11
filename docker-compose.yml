@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tradenest}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tradenest_local_only}
+      POSTGRES_DB: ${POSTGRES_DB:-tradenest}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tradenest} -d ${POSTGRES_DB:-tradenest}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - tradenest_postgres_data:/var/lib/postgresql
+    networks:
+      - tradenest_local
+
+networks:
+  tradenest_local:
+    name: tradenest_local
+
+volumes:
+  tradenest_postgres_data:
+    name: tradenest_postgres_data

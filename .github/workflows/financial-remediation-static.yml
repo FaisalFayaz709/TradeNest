@@ -1,0 +1,24 @@
+name: TradeNest Financial remediation - Remediation Static Verification
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  static-remediation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify blueprint architecture and required REST routes
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-api-contracts.mjs
+      - name: Verify shadcn conventions and fail-closed Stripe refund policy
+        run: |
+          node scripts/verify-financial-remediation.mjs
+          node --experimental-strip-types --test scripts/tests/financial-remediation-financial-safety.test.mjs scripts/tests/financial-remediation-ui-structure.test.mjs
+      - name: Source-only check does NOT approve production
+        run: echo 'Locked runtime, real lockfile, database, storage and Stripe live test acceptance remain mandatory.'

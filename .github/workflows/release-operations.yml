@@ -1,0 +1,37 @@
+name: TradeNest Operations - Operator Safety and Release Guards
+on:
+  push:
+    paths:
+      - 'scripts/ops-*'
+      - 'scripts/ops/**'
+      - 'scripts/verify-operations.mjs'
+      - 'scripts/accept-operations.mjs'
+      - 'scripts/tests/operations.test.mjs'
+      - 'infrastructure/docker/**'
+      - 'docker-compose.deploy.yml'
+      - 'docs/operations-runbook.md'
+      - 'package.json'
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  operator-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Offline architecture, API and operational checks
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-api-contracts.mjs
+          node scripts/verify-operations.mjs
+      - name: Operator safety and negative tests
+        run: node --test scripts/tests/operations.test.mjs
+  # Security's locked-full-stack CI job remains the mandatory build/database/E2E
+  # gate. Do not auto-deploy production or run recovery drills against live data
+  # from GitHub Actions. Those require controlled credentials, live evidence,
+  # and explicit operator authorization outside repository CI.

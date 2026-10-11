@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "source": "TradeNest Technical Blueprint, section 3 (Modular-Monolith Architecture)",
+  "rules": {
+    "deployable": "one NestJS application",
+    "database": "one PostgreSQL database",
+    "controllerDirectPrisma": false,
+    "crossModuleInternalImports": false,
+    "crossModuleMutationsBySharedDatabase": false,
+    "interModuleCommunication": "explicit public service/API boundaries",
+    "aiService": "separate Python/FastAPI specialized workload behind NestJS"
+  },
+  "businessModules": [
+    {"key":"auth","class":"AuthModule","responsibility":"authentication and session boundary"},
+    {"key":"users","class":"UsersModule","responsibility":"user profile and address boundary"},
+    {"key":"catalog","class":"CatalogModule","responsibility":"categories, products, images, and inventory boundary"},
+    {"key":"cart","class":"CartModule","responsibility":"buyer cart boundary"},
+    {"key":"orders","class":"OrdersModule","responsibility":"orders and order state boundary"},
+    {"key":"payments","class":"PaymentsModule","responsibility":"payment provider and payment state boundary"},
+    {"key":"escrow","class":"EscrowModule","responsibility":"escrow state and escrow ledger boundary"},
+    {"key":"shipping","class":"ShippingModule","responsibility":"shipment boundary"},
+    {"key":"disputes","class":"DisputesModule","responsibility":"disputes, messages, and evidence boundary"},
+    {"key":"seller","class":"SellerModule","responsibility":"seller onboarding/profile and seller-facing coordination boundary"},
+    {"key":"analytics","class":"AnalyticsModule","responsibility":"seller analytics boundary"},
+    {"key":"ai-bridge","class":"AIBridgeModule","responsibility":"NestJS-to-FastAPI integration boundary"},
+    {"key":"admin","class":"AdminModule","responsibility":"admin-facing coordination and policy boundary"},
+    {"key":"notifications","class":"NotificationsModule","responsibility":"user notification boundary"}
+  ],
+  "platformModules": ["HealthModule", "DatabaseModule"]
+}

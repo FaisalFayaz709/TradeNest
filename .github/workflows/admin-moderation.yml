@@ -1,0 +1,25 @@
+name: TradeNest Admin - Admin Moderation Source Gates
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Locked architecture and required routes
+        run: |
+          node scripts/verify-architecture.mjs
+          node scripts/verify-api-contracts.mjs
+          node scripts/verify-database-migration-chain.mjs
+      - name: Admin static and negative regression checks
+        run: |
+          node scripts/verify-admin.mjs
+          node --experimental-strip-types --test scripts/tests/admin-guards.test.mjs
+      - name: Runtime signoff remains separate
+        run: echo 'Static checks cannot certify PostgreSQL 18, pnpm 10.15.1, NestJS/Playwright or payment gateway acceptance.'

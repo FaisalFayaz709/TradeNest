@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+
+  /* TradeNest locked brand system — Technical Blueprint §4. */
+  --tradenest-navy: #0b2a4a;
+  --tradenest-blue: #124c7c;
+  --tradenest-teal: #0fa3a3;
+  --tradenest-teal-light: #ddf7f5;
+  --tradenest-gold: #d6a84b;
+  --tradenest-gold-light: #fff6df;
+  --tradenest-background: #f7f9fc;
+  --tradenest-card: #ffffff;
+  --tradenest-border: #e2e8f0;
+  --tradenest-text: #122033;
+  --tradenest-text-secondary: #5f6b7a;
+  --tradenest-success: #16a34a;
+  --tradenest-warning: #f59e0b;
+  --tradenest-danger: #dc2626;
+
+  --tradenest-radius-control: 10px;
+  --tradenest-radius-card: 16px;
+  --tradenest-radius-modal: 20px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--tradenest-background);
+  color: var(--tradenest-text);
+  font-family: "Inter", Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: var(--tradenest-teal-light);
+  color: var(--tradenest-navy);
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  text-underline-offset: 3px;
+}
+
+button:not(:disabled),
+a[href] {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
