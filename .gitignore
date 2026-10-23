@@ -58,3 +58,6 @@ apps/api/skills-lock.json
 
 # Temporary troubleshooting scripts
 /tradenest_fix_*.py
+
+# Local UI baseline reports and screenshots (never commit test-session artifacts)
+.tradenest-qa/

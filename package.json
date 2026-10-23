@@ -2,7 +2,7 @@
   "name": "tradenest",
   "version": "0.0.0",
   "private": true,
-  "description": "TradeNest monorepo \u2014 architecture-locked foundation",
+  "description": "TradeNest monorepo — architecture-locked foundation",
   "engines": {
     "node": ">=24.0.0 <25"
   },
@@ -69,6 +69,7 @@
     "verify:seller-intelligence": "node scripts/verify-seller-intelligence-ai.mjs && node --experimental-strip-types --test scripts/tests/seller-intelligence-ai-guards.test.mjs",
     "acceptance:seller-intelligence": "node scripts/accept-seller-intelligence.mjs",
     "verify:frontend": "node scripts/verify-frontend.mjs && node --experimental-strip-types --test scripts/tests/frontend-integration.test.mjs",
+    "qa:baseline": "node scripts/qa-ui-baseline.mjs",
     "acceptance:frontend": "node scripts/accept-frontend.mjs",
     "verify:payment-compliance": "node scripts/verify-payment-compliance.mjs && node --test scripts/tests/payment-compliance-payment-deployment.test.mjs",
     "acceptance:payment-compliance": "node scripts/accept-payment-compliance.mjs",

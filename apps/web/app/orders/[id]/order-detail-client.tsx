@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, CreditCard, MessageSquareWarning, PackageCheck, ShieldCheck, Star } from 'lucide-react';
-import { useParams } from 'next/navigation';
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, CreditCard, MessageSquareWarning, PackageCheck, RefreshCw, ShieldCheck, Star } from 'lucide-react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { type FormEvent, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { BuyerGate } from '@/components/buyer-gate';
 import { ErrorNotice } from '@/components/error-notice';
 import { LoadingState } from '@/components/loading-state';
@@ -17,17 +17,38 @@ import { apiData, idempotencyKey, jsonData, rememberPaymentId } from '@/lib/api-
 import { uploadManagedFile } from '@/lib/managed-upload';
 import { hostedCheckoutRedirect } from '@/lib/hosted-checkout';
 import { useSession } from '@/components/session-provider';
-import type { Dispute, Escrow, Order, Payment, Review, Shipment } from '@/lib/api-types';
+import type { Dispute, Escrow, Order, OrderStatus, Payment, Review, Shipment } from '@/lib/api-types';
 import { formatMoney } from '@/lib/money';
 
-export function OrderDetailClient() {
-  return <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12"><BuyerGate><Detail /></BuyerGate></main>;
+type OrderSnapshot = { order: Order; escrow: Escrow | null; shipment: Shipment | null };
+
+async function fetchOrderSnapshot(id: string): Promise<OrderSnapshot> {
+  const order = await apiData<Order>(`orders/${encodeURIComponent(id)}`);
+  const [escrow, shipment] = await Promise.all([
+    apiData<Escrow>(`orders/${encodeURIComponent(id)}/escrow`).catch(() => null),
+    apiData<Shipment>(`orders/${encodeURIComponent(id)}/shipment`).catch(() => null),
+  ]);
+  return { order, escrow, shipment };
 }
 
-function Detail() {
-  const { user } = useSession();
+export function OrderDetailClient() {
   const params = useParams<{ id: string }>();
   const id = params.id || '';
+  return (
+    <main className="mx-auto w-full max-w-7xl px-3 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
+      <BuyerGate>
+        <Suspense fallback={<LoadingState label="Loading order…" />}>
+          {id ? <Detail key={id} id={id} /> : <ErrorNotice message="Order not found." />}
+        </Suspense>
+      </BuyerGate>
+    </main>
+  );
+}
+
+function Detail({ id }: { id: string }) {
+  const { user } = useSession();
+  const searchParams = useSearchParams();
+  const gatewayReturn = searchParams.has('payment');
   const [order, setOrder] = useState<Order | null>(null);
   const [escrow, setEscrow] = useState<Escrow | null>(null);
   const [shipment, setShipment] = useState<Shipment | null>(null);
@@ -36,58 +57,202 @@ function Detail() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [gatewayReturn, setGatewayReturn] = useState(false);
-  useEffect(() => { setGatewayReturn(new URLSearchParams(window.location.search).has('payment')); }, []);
+  const busyRef = useRef(false);
   const deliveryKey = useRef<string | null>(null);
   const paymentKey = useRef<string | null>(null);
 
+  const applySnapshot = useCallback((next: OrderSnapshot) => {
+    setOrder(next.order);
+    setEscrow(next.escrow);
+    setShipment(next.shipment);
+  }, []);
+
+  // Initial load is asynchronous and guarded against navigating away before requests finish.
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const next = await fetchOrderSnapshot(id);
+        if (active) applySnapshot(next);
+      } catch (value) {
+        if (active) setError(value instanceof Error ? value.message : 'Could not load order.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [id, applySnapshot]);
+
+  // Explicit user-initiated status refresh: never treats a gateway return as payment proof.
   const load = useCallback(async () => {
-    if (!id) return;
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
-      const value = await apiData<Order>(`orders/${id}`); setOrder(value);
-      void apiData<Escrow>(`orders/${id}/escrow`).then(setEscrow).catch(() => setEscrow(null));
-      void apiData<Shipment>(`orders/${id}/shipment`).then(setShipment).catch(() => setShipment(null));
-    } catch (value) { setError(value instanceof Error ? value.message : 'Could not load order.'); }
-    finally { setLoading(false); }
-  }, [id]);
-  useEffect(() => { void load(); }, [load]);
+      applySnapshot(await fetchOrderSnapshot(id));
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Could not refresh order.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, applySnapshot]);
+
+  async function performAction(action: () => Promise<void>, fallback: string) {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+    } catch (value) {
+      setError(value instanceof Error ? value.message : fallback);
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
 
   async function cancel() {
-    if (!confirm('Request cancellation for this order? The backend will reject the command if the current financial state is not eligible.')) return;
-    setBusy(true); setError(null);
-    try { await jsonData<Order>(`orders/${id}/cancel`, 'POST'); await load(); }
-    catch (value) { setError(value instanceof Error ? value.message : 'Could not cancel order.'); }
-    finally { setBusy(false); }
+    if (busyRef.current || !window.confirm('Request cancellation? The backend will reject this if the payment or order state is not eligible.')) return;
+    await performAction(async () => {
+      await jsonData<Order>(`orders/${id}/cancel`, 'POST');
+      await load();
+    }, 'Could not cancel order.');
   }
 
   async function confirmDelivery() {
-    deliveryKey.current ||= idempotencyKey('confirm-delivery'); setBusy(true); setError(null);
-    try { await jsonData<Order>(`orders/${id}/confirm-delivery`, 'POST', undefined, { 'Idempotency-Key': deliveryKey.current }); deliveryKey.current = null; await load(); }
-    catch (value) { setError(value instanceof Error ? value.message : 'Could not confirm delivery.'); }
-    finally { setBusy(false); }
+    await performAction(async () => {
+      deliveryKey.current ||= idempotencyKey('confirm-delivery');
+      await jsonData<Order>(`orders/${id}/confirm-delivery`, 'POST', undefined, { 'Idempotency-Key': deliveryKey.current });
+      deliveryKey.current = null;
+      await load();
+    }, 'Could not confirm delivery.');
   }
 
   async function startPayment() {
-    paymentKey.current ||= idempotencyKey('payment'); setBusy(true); setError(null);
-    try {
+    await performAction(async () => {
+      paymentKey.current ||= idempotencyKey('payment');
       const result = await jsonData<{ payment: Payment; checkoutUrl?: string }>(`orders/${id}/payments`, 'POST', undefined, { 'Idempotency-Key': paymentKey.current });
       const checkoutUrl = hostedCheckoutRedirect(result.payment.provider, result.checkoutUrl);
-      setPayment(result.payment); if (user) rememberPaymentId(result.payment.id, user.id); paymentKey.current = null;
+      setPayment(result.payment);
+      if (user) rememberPaymentId(result.payment.id, user.id);
+      paymentKey.current = null;
       if (checkoutUrl) window.location.assign(checkoutUrl);
-    }
-    catch (value) { setError(value instanceof Error ? value.message : 'Could not create payment.'); }
-    finally { setBusy(false); }
+    }, 'Could not create payment.');
   }
 
   if (loading) return <LoadingState label="Loading order…" />;
   if (error && !order) return <ErrorNotice message={error} />;
-  if (!order) return null;
+  if (!order) return <ErrorNotice message="Order not found." />;
 
-  return <div><div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><Link href="/orders" className="text-sm font-medium text-[var(--tradenest-blue)] hover:underline">← Back to orders</Link><div className="mt-3 flex flex-wrap items-center gap-3"><h1 className="text-3xl font-semibold tracking-tight text-[var(--tradenest-navy)]">{order.orderNumber}</h1><OrderBadge status={order.status} /></div><p className="mt-2 text-sm text-[var(--tradenest-text-secondary)]">Created {new Date(order.createdAt).toLocaleString()}</p></div><div className="flex flex-wrap gap-2">{order.status === 'PENDING_PAYMENT' ? <Button onClick={() => void startPayment()} disabled={busy}><CreditCard className="size-4" />Create payment</Button> : null}{order.status === 'SHIPPED' ? <Button onClick={() => void confirmDelivery()} disabled={busy}><PackageCheck className="size-4" />Confirm delivery</Button> : null}{order.status === 'PENDING_PAYMENT' ? <Button variant="outline" onClick={() => void cancel()} disabled={busy}>Cancel order</Button> : null}</div></div>{error ? <div className="mb-5"><ErrorNotice message={error} /></div> : null}{payment ? <Card className="mb-5 border-[var(--tradenest-gold)] bg-[var(--tradenest-gold-light)] p-4"><p className="font-semibold text-[var(--tradenest-navy)]">Payment provider request created</p><p className="mt-1 break-all text-xs text-[var(--tradenest-text-secondary)]">{payment.provider} · {payment.providerPaymentId} · status {payment.status}</p><p className="mt-2 text-xs text-[var(--tradenest-text-secondary)]">This status remains provider/backend controlled; this page does not mark the order paid.</p></Card> : null}
+  return (
+    <div className="min-w-0 space-y-5 sm:space-y-6">
+      <div className="flex min-w-0 flex-col gap-4 border-b border-[var(--tradenest-border)] pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <Link href="/orders" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-[var(--tradenest-blue)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--tradenest-focus)]"><ChevronLeft aria-hidden="true" className="size-4" />All orders</Link>
+          <div className="mt-2 flex flex-wrap items-center gap-3"><h1 className="min-w-0 break-all text-2xl font-semibold tracking-tight text-[var(--tradenest-navy)] sm:text-3xl">{order.orderNumber}</h1><OrderBadge status={order.status} /></div>
+          <p className="mt-2 text-sm text-[var(--tradenest-text-secondary)]">Placed {new Date(order.createdAt).toLocaleString()}</p>
+        </div>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          {order.status === 'PENDING_PAYMENT' ? <Button className="flex-1 sm:flex-none" onClick={() => void startPayment()} disabled={busy}><CreditCard aria-hidden="true" className="size-4" />{busy ? 'Working…' : 'Pay for order'}</Button> : null}
+          {order.status === 'SHIPPED' ? <Button className="flex-1 sm:flex-none" onClick={() => void confirmDelivery()} disabled={busy}><PackageCheck aria-hidden="true" className="size-4" />Confirm delivery</Button> : null}
+          {order.status === 'PENDING_PAYMENT' ? <Button className="flex-1 sm:flex-none" variant="outline" onClick={() => void cancel()} disabled={busy}>Cancel order</Button> : null}
+          <Button className="flex-1 sm:flex-none" variant="outline" onClick={() => void load()} disabled={busy}><RefreshCw aria-hidden="true" className="size-4" />Refresh status</Button>
+        </div>
+      </div>
 
-  {gatewayReturn ? <Card className="mb-5 border-[var(--tradenest-gold)] p-4"><p className="text-sm font-medium">Payment gateway return received. Your order will update only after a verified provider webhook; this redirect is not proof of payment.</p><Button className="mt-3" variant="outline" onClick={() => void load()} disabled={busy}>Refresh order status</Button></Card> : null}
-  <div className="grid gap-6 lg:grid-cols-[1fr_380px]"><div className="grid gap-6"><Card className="p-5"><h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Items</h2><div className="mt-4 grid gap-4">{order.items.map((item) => <div key={item.id} className="flex items-start justify-between gap-4 border-b border-[var(--tradenest-border)] pb-4 last:border-0 last:pb-0"><div><p className="font-medium text-[var(--tradenest-text)]">{item.productName}</p><p className="mt-1 text-xs text-[var(--tradenest-text-secondary)]">SKU {item.sku} · Quantity {item.quantity} · {formatMoney(item.unitPrice, order.currency)} each</p></div><strong className="text-sm">{formatMoney(item.totalPrice, order.currency)}</strong></div>)}</div></Card><Card className="p-5"><h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Shipping address snapshot</h2><p className="mt-3 text-sm leading-6 text-[var(--tradenest-text-secondary)]">{order.shippingAddress.recipient}<br />{order.shippingAddress.line1}{order.shippingAddress.line2 ? <><br />{order.shippingAddress.line2}</> : null}<br />{order.shippingAddress.city}{order.shippingAddress.region ? `, ${order.shippingAddress.region}` : ''} {order.shippingAddress.postalCode || ''}<br />{order.shippingAddress.country}</p></Card>{shipment ? <Card className="p-5"><div className="flex items-center gap-2"><PackageCheck className="size-5 text-[var(--tradenest-teal)]" /><h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Shipment</h2><Badge tone="success">{shipment.status}</Badge></div><p className="mt-3 text-sm text-[var(--tradenest-text-secondary)]">{shipment.carrier} · Tracking <strong>{shipment.trackingCode}</strong></p><p className="mt-2 text-xs text-[var(--tradenest-text-secondary)]">Shipped {new Date(shipment.shippedAt).toLocaleString()}{shipment.deliveredAt ? ` · Delivered ${new Date(shipment.deliveredAt).toLocaleString()}` : ''}</p></Card> : null}{order.status === 'COMPLETED' ? <ReviewSection order={order} /> : null}{['PAID', 'PROCESSING', 'SHIPPED'].includes(order.status) ? <DisputeSection orderId={order.id} dispute={dispute} setDispute={setDispute} /> : null}</div><div className="grid h-fit gap-6"><Card className="p-5"><h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Authoritative totals</h2><div className="mt-4 grid gap-2 text-sm"><Row label="Subtotal" value={formatMoney(order.subtotal, order.currency)} /><Row label="Shipping" value={formatMoney(order.shippingAmount, order.currency)} /><Row label="Discount" value={`− ${formatMoney(order.discountAmount, order.currency)}`} /><div className="my-2 border-t border-[var(--tradenest-border)]" /><Row label="Total" value={formatMoney(order.totalAmount, order.currency)} strong /></div></Card><Card className="p-5"><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-[var(--tradenest-gold)]" /><h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Escrow</h2></div>{escrow ? <><div className="mt-4 flex items-center justify-between"><Badge tone={escrow.status === 'RELEASED' ? 'success' : escrow.status === 'REFUNDED' ? 'danger' : 'escrow'}>{escrow.status.replaceAll('_', ' ')}</Badge><strong>{formatMoney(escrow.amount, order.currency)}</strong></div><EscrowTimeline escrow={escrow} /></> : <p className="mt-3 text-sm leading-6 text-[var(--tradenest-text-secondary)]">No escrow record is available yet. A verified successful payment is required before funds can enter HELD state.</p>}</Card></div></div></div>;
+      {error ? <ErrorNotice message={error} /> : null}
+      <OrderJourney status={order.status} />
+
+      {payment ? (
+        <Card role="status" aria-live="polite" className="min-w-0 border-[var(--tradenest-gold)] bg-[var(--tradenest-gold-light)] p-4 sm:p-5">
+          <p className="font-semibold text-[var(--tradenest-navy)]">Payment request created — not confirmed</p>
+          <p className="mt-1 break-all text-xs text-[var(--tradenest-text-secondary)]">{payment.provider} · {payment.providerPaymentId} · {payment.status}</p>
+          <p className="mt-2 text-sm text-[var(--tradenest-text-secondary)]">Only the backend can verify a provider payment and update the order or escrow.</p>
+          <Link href="/payments" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[var(--tradenest-blue)] hover:underline">View payment records</Link>
+        </Card>
+      ) : null}
+      {gatewayReturn ? (
+        <Card className="min-w-0 border-[var(--tradenest-gold)] p-4 sm:p-5">
+          <p className="font-semibold text-[var(--tradenest-navy)]">Returned from payment provider</p>
+          <p className="mt-2 text-sm leading-6 text-[var(--tradenest-text-secondary)]">This redirect is not proof of payment. An authenticated provider webhook must be verified by the backend before order status changes.</p>
+          <Button className="mt-3 w-full sm:w-auto" variant="outline" onClick={() => void load()} disabled={busy}><RefreshCw aria-hidden="true" className="size-4" />Check updated status</Button>
+        </Card>
+      ) : null}
+
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(290px,360px)] lg:items-start lg:gap-6">
+        <div className="min-w-0 space-y-5">
+          <Card className="min-w-0 p-4 sm:p-5">
+            <h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Items in this order</h2>
+            <div className="mt-4 grid gap-4">
+              {order.items.map((item) => (
+                <div key={item.id} className="flex min-w-0 flex-col gap-2 border-b border-[var(--tradenest-border)] pb-4 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <div className="min-w-0"><p className="break-words font-semibold text-[var(--tradenest-text)]">{item.productName}</p><p className="mt-1 break-all text-xs text-[var(--tradenest-text-secondary)]">SKU {item.sku}</p><p className="mt-1 text-xs text-[var(--tradenest-text-secondary)]">{item.quantity} × {formatMoney(item.unitPrice, order.currency)}</p></div>
+                  <strong className="shrink-0 text-sm text-[var(--tradenest-navy)]">{formatMoney(item.totalPrice, order.currency)}</strong>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card className="min-w-0 p-4 sm:p-5">
+            <h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Delivery address</h2>
+            <address className="mt-3 break-words text-sm not-italic leading-6 text-[var(--tradenest-text-secondary)]">
+              {order.shippingAddress.recipient}<br />{order.shippingAddress.line1}
+              {order.shippingAddress.line2 ? <><br />{order.shippingAddress.line2}</> : null}<br />
+              {order.shippingAddress.city}{order.shippingAddress.region ? `, ${order.shippingAddress.region}` : ''} {order.shippingAddress.postalCode || ''}<br />{order.shippingAddress.country}
+            </address>
+          </Card>
+          {shipment ? (
+            <Card className="min-w-0 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center gap-2"><PackageCheck aria-hidden="true" className="size-5 text-[var(--tradenest-teal)]" /><h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Shipment</h2><Badge tone="success">{shipment.status}</Badge></div>
+              <p className="mt-3 break-words text-sm text-[var(--tradenest-text-secondary)]">{shipment.carrier} · Tracking <strong className="break-all text-[var(--tradenest-navy)]">{shipment.trackingCode}</strong></p>
+              <p className="mt-2 text-xs text-[var(--tradenest-text-secondary)]">Shipped {new Date(shipment.shippedAt).toLocaleString()}{shipment.deliveredAt ? ` · Delivered ${new Date(shipment.deliveredAt).toLocaleString()}` : ''}</p>
+            </Card>
+          ) : null}
+          {order.status === 'COMPLETED' ? <ReviewSection order={order} /> : null}
+          {['PAID', 'PROCESSING', 'SHIPPED'].includes(order.status) ? <DisputeSection orderId={order.id} dispute={dispute} setDispute={setDispute} /> : null}
+        </div>
+        <aside className="min-w-0 space-y-5 lg:sticky lg:top-24">
+          <Card className="p-4 sm:p-5">
+            <h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Order summary</h2>
+            <p className="mt-1 text-xs text-[var(--tradenest-text-secondary)]">Authoritative backend totals</p>
+            <div className="mt-4 grid gap-3 text-sm"><Row label="Subtotal" value={formatMoney(order.subtotal, order.currency)} /><Row label="Shipping" value={formatMoney(order.shippingAmount, order.currency)} /><Row label="Discount" value={`− ${formatMoney(order.discountAmount, order.currency)}`} /><div className="my-1 border-t border-[var(--tradenest-border)]" /><Row label="Total" value={formatMoney(order.totalAmount, order.currency)} strong /></div>
+          </Card>
+          <Card className="p-4 sm:p-5">
+            <div className="flex items-center gap-2"><ShieldCheck aria-hidden="true" className="size-5 text-[var(--tradenest-gold)]" /><h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Escrow status</h2></div>
+            {escrow ? <><div className="mt-4 flex flex-wrap items-center justify-between gap-3"><Badge tone={escrow.status === 'RELEASED' ? 'success' : escrow.status === 'REFUNDED' ? 'danger' : 'escrow'}>{escrow.status.replaceAll('_', ' ')}</Badge><strong>{formatMoney(escrow.amount, order.currency)}</strong></div><EscrowTimeline escrow={escrow} /></> : <p className="mt-3 text-sm leading-6 text-[var(--tradenest-text-secondary)]">Escrow information is not currently available. Funds are held only after backend-verified payment.</p>}
+          </Card>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function OrderJourney({ status }: { status: OrderStatus }) {
+  const steps: Array<{ status: OrderStatus; label: string }> = [
+    { status: 'PENDING_PAYMENT', label: 'Payment pending' },
+    { status: 'PAID', label: 'Payment verified' },
+    { status: 'PROCESSING', label: 'Preparing order' },
+    { status: 'SHIPPED', label: 'Shipped' },
+    { status: 'DELIVERED', label: 'Delivered' },
+    { status: 'COMPLETED', label: 'Completed' },
+  ];
+  const currentIndex = steps.findIndex((step) => step.status === status);
+  if (currentIndex < 0) {
+    return <Card className="p-4 sm:p-5"><h2 className="text-sm font-semibold text-[var(--tradenest-navy)]">Order update</h2><p className="mt-2 text-sm text-[var(--tradenest-text-secondary)]">Current backend status: <strong>{status.replaceAll('_', ' ')}</strong>. Open the details below for available actions.</p></Card>;
+  }
+  return (
+    <Card className="min-w-0 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-[var(--tradenest-navy)]">Order progress</h2><span className="text-xs text-[var(--tradenest-text-secondary)]">As reported by TradeNest</span></div>
+      <ol className="mt-5 grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 lg:grid-cols-6" aria-label="Order progress stages">
+        {steps.map((step, index) => (
+          <li key={step.status} aria-current={index === currentIndex ? 'step' : undefined} className="min-w-0 text-xs">
+            <div className={`mb-2 h-1.5 rounded-full ${index <= currentIndex ? 'bg-[var(--tradenest-teal)]' : 'bg-slate-200'}`} aria-hidden="true" />
+            <span className={index === currentIndex ? 'font-bold text-[var(--tradenest-navy)]' : 'text-[var(--tradenest-text-secondary)]'}>{step.label}</span>
+          </li>
+        ))}
+      </ol>
+      {status === 'PENDING_PAYMENT' ? <p className="mt-4 text-xs leading-5 text-[var(--tradenest-text-secondary)]">Your order is awaiting backend-verified payment; returning from a provider does not mean it is paid.</p> : null}
+    </Card>
+  );
 }
 
 function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) { return <div className={`flex justify-between gap-4 ${strong ? 'font-semibold text-[var(--tradenest-navy)]' : ''}`}><span className={strong ? '' : 'text-[var(--tradenest-text-secondary)]'}>{label}</span><span>{value}</span></div>; }

@@ -12,27 +12,39 @@ type SessionState = {
 
 const SessionContext = createContext<SessionState | null>(null);
 
+async function fetchSessionUser(): Promise<AuthUser | null> {
+  try {
+    const response = await fetch('/api/session/me', { cache: 'no-store' });
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as { data?: AuthUser };
+    return payload.data || null;
+  } catch {
+    return null;
+  }
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    try {
-      const response = await fetch('/api/session/me', { cache: 'no-store' });
-      if (!response.ok) {
-        setUser(null);
-        return;
-      }
-      const payload = (await response.json()) as { data?: AuthUser };
-      setUser(payload.data || null);
-    } catch {
-      setUser(null);
-    }
+    setUser(await fetchSessionUser());
   }, []);
 
   useEffect(() => {
-    void refresh().finally(() => setLoading(false));
-  }, [refresh]);
+    let active = true;
+
+    void fetchSessionUser().then((currentUser) => {
+      if (!active) return;
+      setUser(currentUser);
+      setLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const logout = useCallback(async () => {
     await fetch('/api/session/logout', { method: 'POST' });

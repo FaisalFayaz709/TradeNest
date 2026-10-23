@@ -140,7 +140,15 @@ if (!failures.length) {
   textHas('apps/api/src/modules/ai-bridge/pricing.controller.ts',"@Post('seller/products/:id/price-suggestion')","@Get('seller/ai-insights')");
   textHas('apps/api/src/modules/orders/checkout.controller.ts',"@RateLimit('CHECKOUT_PRINCIPAL')");
   textHas('apps/api/src/modules/disputes/disputes.controller.ts',"@RateLimit('ADMIN_SENSITIVE_PRINCIPAL')");
-  textHas('apps/web/e2e/commerce-workflows.spec.ts','Create payment with configured provider','Confirm delivery','Open dispute','Refund buyer','Release to seller');
+  // UI copy may change. Verify payment creation still goes through an authenticated
+  // backend POST, and successful payment is established by the sandbox provider
+  // webhook—not by a browser-controlled success state.
+  textHas('apps/web/e2e/commerce-workflows.spec.ts',
+    'orders/${checkoutPayload.data.order.id}/payments',
+    "response.request().method() === 'POST'",
+    'expect(createdPayment.ok()).toBeTruthy()',
+    'await succeedSandboxPayment(completedPurchase.payment)',
+    'Confirm delivery', 'Open dispute', 'Refund buyer', 'Release to seller');
   textHas('apps/api/src/common/observability/http-observability.interceptor.ts','recordHttpRequest','requestId');
   textHas('infrastructure/docker/api.Dockerfile','node:24-bookworm-slim','pnpm install --frozen-lockfile');
   textHas('infrastructure/docker/web.Dockerfile','node:24-bookworm-slim','pnpm install --frozen-lockfile');

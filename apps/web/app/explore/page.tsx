@@ -4,5 +4,11 @@ import { PageShell } from '@/components/page-shell';
 import { ExploreQueryGrid } from './explore-query';
 
 export default function ExplorePage() {
-  return <PageShell eyebrow="Public marketplace" title="Explore TradeNest" description="Browse active listings. Availability and prices shown here are catalog information; checkout revalidates current stock and authoritative totals."><Suspense fallback={<LoadingState label="Loading marketplace…" />}><ExploreQueryGrid /></Suspense></PageShell>;
+  return (
+    <PageShell eyebrow="The marketplace" title="Explore products" description="Find something you love from the live TradeNest catalog. Browse by category or search for a particular item.">
+      <Suspense fallback={<LoadingState label="Loading marketplace…" />}>
+        <ExploreQueryGrid />
+      </Suspense>
+    </PageShell>
+  );
 }

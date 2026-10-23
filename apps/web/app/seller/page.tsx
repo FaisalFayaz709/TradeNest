@@ -35,13 +35,45 @@ function Dashboard() {
       else setError(value instanceof Error ? value.message : 'Could not load seller dashboard.');
     } finally { setLoading(false); }
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    let active = true;
+
+    void apiData<SellerDashboard>('seller/dashboard')
+      .then((result) => {
+        if (!active) return;
+        setDashboard(result);
+        setMissing(false);
+
+        void apiData<SellerAnalytics>('seller/analytics/overview')
+          .then((insights) => {
+            if (active) setAnalytics(insights);
+          })
+          .catch(() => {
+            if (active) setAnalytics(null);
+          });
+      })
+      .catch((value: unknown) => {
+        if (!active) return;
+        if (value instanceof TradeNestApiError && value.code === 'SELLER_PROFILE_NOT_FOUND') {
+          setMissing(true);
+        } else {
+          setError(value instanceof Error ? value.message : 'Could not load seller dashboard.');
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
   if (loading) return <LoadingState label="Loading seller dashboard…" />;
   if (error) return <ErrorNotice message={error} />;
   if (missing) return <Onboarding onComplete={() => void load()} />;
   if (!dashboard) return null;
   const profile = dashboard.profile;
-  return <div className="grid gap-6"><Card className="p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><Store className="size-5 text-[var(--tradenest-teal)]" /><h2 className="text-xl font-semibold text-[var(--tradenest-navy)]">{profile.storeName}</h2><Badge tone={profile.status === 'ACTIVE' ? 'success' : 'warning'}>{profile.status}</Badge></div><p className="mt-2 text-sm text-[var(--tradenest-text-secondary)]">Store slug: {profile.slug}{profile.rating === null ? ' · No rating yet' : ` · Rating ${profile.rating.toFixed(1)}/5`}</p></div><Link href="/seller/settings"><Button variant="outline">Store settings</Button></Link></div></Card><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric icon={PackageCheck} label="Orders" value={String(analytics?.kpis.orderCount ?? '—')} /><Metric icon={Boxes} label="Units sold" value={String(analytics?.kpis.productsSold ?? '—')} /><Metric icon={BarChart3} label="Conversion" value={analytics?.kpis.conversionRatePercent == null ? '—' : `${analytics.kpis.conversionRatePercent.toFixed(2)}%`} /><Metric icon={ShieldCheck} label="Escrow states" value={String(analytics?.escrowByStatus.length ?? '—')} /></div>{analytics?.kpis.revenueByCurrency.length ? <Card className="p-6"><h2 className="font-semibold text-[var(--tradenest-navy)]">Revenue</h2><div className="mt-4 flex flex-wrap gap-3">{analytics.kpis.revenueByCurrency.map((money) => <div key={money.currency} className="rounded-xl bg-slate-50 px-4 py-3"><p className="text-xs text-[var(--tradenest-text-secondary)]">{money.currency}</p><p className="mt-1 text-lg font-semibold text-[var(--tradenest-navy)]">{formatMoney(money.amount, money.currency)}</p></div>)}</div></Card> : null}<div className="grid gap-4 md:grid-cols-3"><Quick href="/seller/products" title="Catalog" text="Create, publish, archive, and maintain your own products." /><Quick href="/seller/orders" title="Fulfillment" text="Review seller orders and create eligible shipments." /><Quick href="/seller/analytics" title="Analytics" text="Inspect authoritative KPIs, stock signals, and escrow distribution." /></div></div>;
+  return <div className="grid gap-6"><Card className="p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><Store className="size-5 text-[var(--tradenest-teal)]" /><h2 className="text-xl font-semibold text-[var(--tradenest-navy)]">{profile.storeName}</h2><Badge tone={profile.status === 'ACTIVE' ? 'success' : 'warning'}>{profile.status}</Badge></div><p className="mt-2 text-sm text-[var(--tradenest-text-secondary)]">Store slug: {profile.slug}{profile.rating === null ? ' · No rating yet' : ` · Rating ${profile.rating.toFixed(1)}/5`}</p></div><Button variant="outline" asChild><Link href="/seller/settings">Store settings</Link></Button></div></Card><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric icon={PackageCheck} label="Orders" value={String(analytics?.kpis.orderCount ?? '—')} /><Metric icon={Boxes} label="Units sold" value={String(analytics?.kpis.productsSold ?? '—')} /><Metric icon={BarChart3} label="Conversion" value={analytics?.kpis.conversionRatePercent == null ? '—' : `${analytics.kpis.conversionRatePercent.toFixed(2)}%`} /><Metric icon={ShieldCheck} label="Escrow states" value={String(analytics?.escrowByStatus.length ?? '—')} /></div>{analytics?.kpis.revenueByCurrency.length ? <Card className="p-6"><h2 className="font-semibold text-[var(--tradenest-navy)]">Revenue</h2><div className="mt-4 flex flex-wrap gap-3">{analytics.kpis.revenueByCurrency.map((money) => <div key={money.currency} className="rounded-xl bg-slate-50 px-4 py-3"><p className="text-xs text-[var(--tradenest-text-secondary)]">{money.currency}</p><p className="mt-1 text-lg font-semibold text-[var(--tradenest-navy)]">{formatMoney(money.amount, money.currency)}</p></div>)}</div></Card> : null}<div className="grid gap-4 md:grid-cols-3"><Quick href="/seller/products" title="Catalog" text="Create, publish, archive, and maintain your own products." /><Quick href="/seller/orders" title="Fulfillment" text="Review seller orders and create eligible shipments." /><Quick href="/seller/analytics" title="Analytics" text="Inspect authoritative KPIs, stock signals, and escrow distribution." /></div></div>;
 }
 
 function Onboarding({ onComplete }: { onComplete: () => void }) {

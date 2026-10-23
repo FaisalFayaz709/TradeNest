@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BarChart3, Boxes, BrainCircuit, CreditCard, Gauge, Gavel, PackageSearch, Settings, ShieldCheck, Store } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { SellerGate } from '../seller-gate';
+import { WorkspaceNav } from '../workspace-nav';
 
 const links = [
   { href: '/seller', label: 'Dashboard', icon: Gauge },
@@ -19,7 +19,32 @@ const links = [
   { href: '/seller/settings', label: 'Settings', icon: Settings },
 ];
 
-export function SellerShell({ title, description, action, children }: { title: string; description?: string; action?: ReactNode; children: ReactNode }) {
+type SellerShellProps = {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  children: ReactNode;
+};
+
+export function SellerShell({ title, description, action, children }: SellerShellProps) {
   const pathname = usePathname();
-  return <SellerGate><main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[220px_1fr] lg:px-8 lg:py-10"><aside className="h-fit rounded-[var(--tradenest-radius-card)] border border-[var(--tradenest-border)] bg-white p-3 shadow-[0_8px_30px_rgba(11,42,74,0.05)]"><div className="mb-3 px-3 py-2"><p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--tradenest-teal)]">Seller workspace</p></div><nav className="grid gap-1">{links.map(({ href, label, icon: Icon }) => { const active = href === '/seller' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`); return <Link key={href} href={href} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${active ? 'bg-[var(--tradenest-navy)] text-white' : 'text-[var(--tradenest-text-secondary)] hover:bg-slate-50 hover:text-[var(--tradenest-text)]'}`}><Icon className="size-4" />{label}</Link>; })}</nav></aside><section className="min-w-0"><div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--tradenest-teal)]">Seller</p><h1 className="text-3xl font-semibold tracking-tight text-[var(--tradenest-navy)]">{title}</h1>{description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--tradenest-text-secondary)]">{description}</p> : null}</div>{action}</div>{children}</section></main></SellerGate>;
+
+  return (
+    <SellerGate>
+      <main className="mx-auto grid w-full min-w-0 max-w-7xl gap-5 px-3 py-5 sm:px-6 sm:py-8 xl:grid-cols-[220px_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-8 xl:py-10">
+        <WorkspaceNav kind="seller" pathname={pathname} links={links} />
+        <section className="min-w-0">
+          <div className="mb-6 flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between xl:mb-7">
+            <div className="min-w-0">
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--tradenest-teal-action)]">Seller</p>
+              <h1 className="break-words text-2xl font-semibold tracking-tight text-[var(--tradenest-navy)] sm:text-3xl">{title}</h1>
+              {description ? <p className="mt-2 max-w-3xl break-words text-sm leading-6 text-[var(--tradenest-text-secondary)]">{description}</p> : null}
+            </div>
+            {action ? <div className="min-w-0 shrink-0">{action}</div> : null}
+          </div>
+          {children}
+        </section>
+      </main>
+    </SellerGate>
+  );
 }

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { randomUUID } from 'node:crypto';
 import { hash } from 'bcrypt';
 import { Client } from 'pg';
 
@@ -33,11 +34,11 @@ try {
   const ids = new Map<string, string>();
   for (const fixture of fixtures) {
     const result = await db.query<{ id: string }>(
-      `INSERT INTO users (email,password_hash,name,role,status)
-       VALUES ($1,$2,$3,$4::user_role,'ACTIVE')
+      `INSERT INTO users (id,email,password_hash,name,role,status)
+       VALUES ($1::uuid,$2,$3,$4,$5::user_role,'ACTIVE')
        ON CONFLICT (email) DO UPDATE SET password_hash=EXCLUDED.password_hash,name=EXCLUDED.name,role=EXCLUDED.role,status='ACTIVE',updated_at=now()
        RETURNING id`,
-      [fixture.email.toLowerCase(), passwordHash, fixture.name, fixture.role],
+      [randomUUID(), fixture.email.toLowerCase(), passwordHash, fixture.name, fixture.role],
     );
     ids.set(fixture.role, result.rows[0]!.id);
   }

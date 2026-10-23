@@ -1,6 +1,9 @@
 import { notFound } from 'next/navigation';
 import { RoleWorkflowClient, type E2eFixture } from './role-workflow-client';
 
+// This E2E-only diagnostic route must never be statically prerendered.
+export const dynamic = 'force-dynamic';
+
 export default function E2eRoleWorkflowPage() {
   if (process.env.TRADENEST_E2E_UI !== '1') notFound();
 

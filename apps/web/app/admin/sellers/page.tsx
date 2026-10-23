@@ -19,7 +19,29 @@ export default function AdminSellersPage() {
     try { setRows((await apiCollection<AdminSellerSummary>('admin/sellers?page=1&limit=100')).data); }
     catch (error) { setError(error instanceof Error ? error.message : 'Could not load sellers.'); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+
+    void apiCollection<AdminSellerSummary>('admin/sellers?page=1&limit=100')
+      .then((response) => {
+        if (!active) return;
+        setRows(response.data);
+        setError(null);
+      })
+      .catch((value: unknown) => {
+        if (!active) return;
+        setError(
+          value instanceof Error
+            ? value.message
+            : 'Could not load sellers.'
+        );
+        setRows([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
   async function moderate(seller: AdminSellerSummary, action: 'suspend' | 'reactivate') {
     setError(null); setBusy(seller.userId);
     try {

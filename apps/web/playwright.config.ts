@@ -18,16 +18,21 @@ const apiEnvironment = {
   CATALOG_DEFAULT_CURRENCY: 'USD',
   PAYMENT_PROVIDER: 'sandbox',
   PAYMENT_SANDBOX_WEBHOOK_SECRET: webhookSecret,
+  // The real outbox reconciler is needed to verify provider-confirmed refunds.
+  // Its test-only startup gate separately requires this exact local sandbox DB.
+  TRADENEST_E2E_REFUND_WORKER: '1',
 };
 
 export default defineConfig({
   testDir: './e2e',
+  // Baseline capture is opt-in: regular E2E stays focused on behavior.
+  testIgnore: process.env.TRADENEST_CAPTURE_BASELINE === '1' ? [] : ['**/baseline-visual.spec.ts'],
   fullyParallel: false,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: process.env.CI ? [['html', { open: 'never' }], ['list']] : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: 'http://localhost:3000',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -41,8 +46,12 @@ export default defineConfig({
       env: { ...inheritedEnvironment, ...apiEnvironment },
     },
     {
-      command: 'pnpm --filter @tradenest/web dev',
-      url: 'http://127.0.0.1:3000/api/health',
+      // Next.js can normalize loopback request URLs to localhost internally.
+      // Match the browser Origin to that hostname so the strict CSRF guard
+      // continues to reject mismatched origins without an E2E exception.
+      // Keep Webpack for stable browser tests.
+      command: 'pnpm --filter @tradenest/web dev --hostname localhost --webpack',
+      url: 'http://localhost:3000/api/health',
       timeout: 120_000,
       reuseExistingServer: false,
       env: {

@@ -17,7 +17,24 @@ export default function SellerInventoryPage() { return <SellerShell title="Inven
 function InventoryList() {
   const [products, setProducts] = useState<Product[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   async function load() { setLoading(true); setError(null); try { setProducts(await allSellerProducts()); } catch (value) { setError(value instanceof Error ? value.message : 'Could not load inventory.'); } finally { setLoading(false); } }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    let active = true;
+
+    void allSellerProducts()
+      .then((items) => {
+        if (active) setProducts(items);
+      })
+      .catch((value: unknown) => {
+        if (active) setError(value instanceof Error ? value.message : 'Could not load inventory.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
   if (loading) return <LoadingState label="Loading inventory…" />;
   if (error) return <ErrorNotice message={error} />;
   return <div className="grid gap-4">{products.map((product) => <InventoryRow key={product.id} product={product} refresh={() => void load()} />)}{!products.length ? <Card className="p-8 text-center text-sm text-[var(--tradenest-text-secondary)]"><Boxes className="mx-auto size-6" /><p className="mt-3">No seller products yet.</p></Card> : null}</div>;

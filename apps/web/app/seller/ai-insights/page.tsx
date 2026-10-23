@@ -7,7 +7,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { LoadingState } from '@/components/loading-state';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { apiData, jsonData } from '@/lib/api-client';
+import { jsonData } from '@/lib/api-client';
 import type { Product, SmartPricingSuggestion } from '@/lib/api-types';
 import { allSellerProducts } from '@/lib/seller-data';
 import { formatMoney } from '@/lib/money';

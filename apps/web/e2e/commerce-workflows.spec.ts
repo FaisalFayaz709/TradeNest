@@ -1,5 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 const password = process.env.E2E_SHARED_PASSWORD ?? 'TradeNest-E2E-Only-2026!';
 const webhookSecret = process.env.E2E_PAYMENT_WEBHOOK_SECRET ?? 'test-playwright-webhook-secret-at-least-32-characters';
@@ -14,13 +14,52 @@ type OrderPayload = { id: string; orderNumber: string; totalAmount: string; curr
 type PaymentPayload = { id: string; providerPaymentId: string; amount: string; currency: string };
 type DisputePayload = { id: string; orderId: string; status: string };
 
-async function signIn(page: Page, role: keyof typeof accounts) {
-  await page.context().clearCookies();
+// The full commerce journey intentionally changes roles many times. Repeated
+// logins would exhaust the *real* 8-per-identity / 5-minute auth rate limit,
+// breaking unrelated browser tests later in the same Playwright worker.
+// Keep each account's HttpOnly cookies only in this test process; never write
+// cookie values to disk or relax the production login limiter.
+type AccountRole = keyof typeof accounts;
+type SessionCookies = Awaited<ReturnType<BrowserContext['cookies']>>;
+const sessionCookiesByRole = new Map<AccountRole, SessionCookies>();
+let activeRole: AccountRole | null = null;
+const sessionCookieNames = new Set(['tradenest_access', 'tradenest_refresh']);
+
+async function signIn(page: Page, role: AccountRole) {
+  const context = page.context();
+  // Save the most recent cookies of the account we're leaving, including any
+  // server-rotated tokens from an earlier authenticated request.
+  if (activeRole) {
+    const current = (await context.cookies('http://localhost:3000'))
+      .filter((cookie) => sessionCookieNames.has(cookie.name));
+    if (current.length === 2) sessionCookiesByRole.set(activeRole, current);
+  }
+  await context.clearCookies();
+
+  const previouslyAuthenticated = sessionCookiesByRole.get(role);
+  if (previouslyAuthenticated) {
+    await context.addCookies(previouslyAuthenticated);
+    const sessionResponse = await page.request.get('/api/session/me');
+    expect(sessionResponse.status(), `Reused ${role} session is not authenticated`).toBe(200);
+    const session = (await sessionResponse.json()) as { data?: { role?: string } };
+    expect(session.data?.role).toBe(role);
+    activeRole = role;
+    await page.goto(role === 'BUYER' ? '/explore' : role === 'SELLER' ? '/seller' : '/admin');
+    return;
+  }
+
+  // Exercise the real form and real NestJS authentication once per role.
   await page.goto('/auth/login');
   await page.getByLabel('Email').fill(accounts[role]);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(role === 'BUYER' ? /\/explore$/ : role === 'SELLER' ? /\/seller$/ : /\/admin$/);
+
+  const cookies = (await context.cookies('http://localhost:3000'))
+    .filter((cookie) => sessionCookieNames.has(cookie.name));
+  expect(cookies.map((cookie) => cookie.name).sort()).toEqual(['tradenest_access', 'tradenest_refresh']);
+  sessionCookiesByRole.set(role, cookies);
+  activeRole = role;
 }
 
 async function createSellerProduct(page: Page): Promise<ProductPayload> {
@@ -88,23 +127,26 @@ async function buyProduct(page: Page, product: ProductPayload): Promise<{ order:
   await expect(page.getByText('Added to cart.')).toBeVisible();
   await page.goto('/cart');
   await expect(page.getByText(product.name, { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Continue to checkout' }).click();
-  await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible();
-  await expect(page.getByText(/Inventory is .*not reserved/i)).toBeVisible();
+  // Cart navigation is a real anchor (Button asChild), not a submit button.
+  const checkoutLink = page.getByRole('link', { name: 'Continue to checkout' });
+  await expect(checkoutLink).toBeVisible();
+  await checkoutLink.click();
+  await expect(page.getByRole('heading', { name: 'Review your order' })).toBeVisible();
+  await expect(page.getByText(/The quote does not reserve stock/i)).toBeVisible();
 
   const checkoutResponse = page.waitForResponse((response) => response.url().endsWith('/api/tradenest/checkout') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Create order' }).click();
   const checkout = await checkoutResponse;
   expect(checkout.ok()).toBeTruthy();
   const checkoutPayload = (await checkout.json()) as { data: { order: OrderPayload } };
-  await expect(page.getByText('Order created')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your order has been created' })).toBeVisible();
 
   const paymentResponse = page.waitForResponse((response) => response.url().includes(`/api/tradenest/orders/${checkoutPayload.data.order.id}/payments`) && response.request().method() === 'POST');
-  await page.getByRole('button', { name: 'Create payment with configured provider' }).click();
+  await page.getByRole('button', { name: 'Continue to payment' }).click();
   const createdPayment = await paymentResponse;
   expect(createdPayment.ok()).toBeTruthy();
   const paymentPayload = (await createdPayment.json()) as { data: { payment: PaymentPayload } };
-  await expect(page.getByText(/Provider payment ID:/)).toBeVisible();
+  await expect(page.getByText(/Provider:.*Reference:/)).toBeVisible();
   return { order: checkoutPayload.data.order, payment: paymentPayload.data.payment };
 }
 
@@ -160,8 +202,30 @@ async function resolveDispute(page: Page, dispute: DisputePayload, action: 'Refu
   await expect(page.getByRole('heading', { name: 'Dispute review' })).toBeVisible();
   const response = page.waitForResponse((candidate) => candidate.url().includes(`/api/tradenest/admin/disputes/${dispute.id}/resolve`) && candidate.request().method() === 'POST');
   await page.getByRole('button', { name: action }).click();
-  expect((await response).ok()).toBeTruthy();
-  await expect(page.getByText(/Resolution:/)).toBeVisible();
+  const resolved = await response;
+  expect(resolved.ok()).toBeTruthy();
+  const outcome = (await resolved.json()) as {
+    data: { status: string; resolution?: string | null };
+    meta?: { financialOutcome?: string };
+  };
+  if (action === 'Refund buyer') {
+    // A 200 means the durable refund obligation was QUEUED, not refunded.
+    // Do not treat an HTTP response or a browser state change as proof of money movement.
+    expect(outcome.meta?.financialOutcome).toBe('PENDING_PROVIDER_CONFIRMATION');
+    expect(outcome.data.status).toBe('OPEN');
+    await expect.poll(async () => {
+      const read = await page.request.get(`/api/tradenest/disputes/${dispute.id}`);
+      expect(read.ok()).toBeTruthy();
+      const payload = (await read.json()) as { data: { status: string; resolution: string | null } };
+      return `${payload.data.status}:${payload.data.resolution ?? ''}`;
+    }, { timeout: 60_000, intervals: [1_000, 2_000] }).toBe('RESOLVED:REFUND_BUYER');
+    await page.reload();
+    await expect(page.getByText(/Resolution: REFUND BUYER/)).toBeVisible();
+  } else {
+    expect(outcome.meta?.financialOutcome).toBe('FINALIZED');
+    expect(outcome.data.status).toBe('RESOLVED');
+    await expect(page.getByText(/Resolution: RELEASE TO SELLER/)).toBeVisible();
+  }
 }
 
 test('complete Buyer, Seller, dispute, and Admin hardening journeys through the real Next.js UI', async ({ page }) => {
@@ -190,7 +254,8 @@ test('complete Buyer, Seller, dispute, and Admin hardening journeys through the 
   await page.getByRole('button', { name: 'Confirm delivery' }).click();
   expect((await deliveryResponse).ok()).toBeTruthy();
   await expect(page.getByText('COMPLETED', { exact: true })).toBeVisible();
-  await expect(page.getByText('RELEASED', { exact: true })).toBeVisible();
+  // The escrow badge and the status timeline both show the authoritative release state.
+  await expect(page.getByText('RELEASED', { exact: true }).first()).toBeVisible();
   await page.getByPlaceholder('Optional review comment').fill('Verified E2E purchase completed successfully.');
   const reviewResponse = page.waitForResponse((candidate) => candidate.url().includes(`/api/tradenest/orders/${completedPurchase.order.id}/reviews`) && candidate.request().method() === 'POST');
   await page.getByRole('button', { name: 'Submit verified-purchase review' }).click();
@@ -212,7 +277,8 @@ test('complete Buyer, Seller, dispute, and Admin hardening journeys through the 
   await resolveDispute(page, refundDispute, 'Refund buyer');
   await signIn(page, 'BUYER');
   await page.goto(`/orders/${refundPurchase.order.id}`);
-  await expect(page.getByText('REFUNDED', { exact: true })).toBeVisible();
+  // Both the order state and escrow read model may legitimately display REFUNDED.
+  await expect(page.getByText('REFUNDED', { exact: true }).first()).toBeVisible();
 
   // Dispute branch 2: exercise the alternate Admin release resolution.
   const releasePurchase = await buyProduct(page, product);

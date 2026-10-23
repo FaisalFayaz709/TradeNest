@@ -16,11 +16,30 @@ import { apiData, jsonData } from '@/lib/api-client';
 import { uploadManagedFile } from '@/lib/managed-upload';
 import type { Dispute } from '@/lib/api-types';
 
-export function SellerDisputeDetailClient() { const params = useParams<{ id: string }>(); return <SellerShell title="Dispute detail" description="Seller participation is limited to viewing, messaging, and evidence. Only Admin can resolve the financial outcome."><Detail id={params.id || ''} /></SellerShell>; }
+export function SellerDisputeDetailClient() { const params = useParams<{ id: string }>(); const id = params.id || ''; return <SellerShell title="Dispute detail" description="Seller participation is limited to viewing, messaging, and evidence. Only Admin can resolve the financial outcome."><Detail key={id} id={id} /></SellerShell>; }
 function Detail({ id }: { id: string }) {
   const [dispute, setDispute] = useState<Dispute | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => { setLoading(true); setError(null); try { setDispute(await apiData<Dispute>(`disputes/${id}`)); } catch (value) { setError(value instanceof Error ? value.message : 'Could not load dispute.'); } finally { setLoading(false); } }, [id]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+
+    void apiData<Dispute>(`disputes/${id}`)
+      .then((value) => {
+        if (!active) return;
+        setDispute(value);
+        setError(null);
+      })
+      .catch((value: unknown) => {
+        if (active) setError(value instanceof Error ? value.message : 'Could not load dispute.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
   if (loading) return <LoadingState label="Loading dispute…" />; if (error && !dispute) return <ErrorNotice message={error} />; if (!dispute) return null;
   return <div className="grid gap-6"><div><Link href="/seller/disputes" className="text-sm font-medium text-[var(--tradenest-blue)] hover:underline">← Back to disputes</Link><div className="mt-3 flex flex-wrap items-center gap-2"><h2 className="text-2xl font-semibold text-[var(--tradenest-navy)]">{dispute.reason}</h2><Badge tone={dispute.status === 'OPEN' ? 'warning' : 'success'}>{dispute.status}</Badge>{dispute.resolution ? <Badge tone={dispute.resolution === 'REFUND_BUYER' ? 'danger' : 'success'}>{dispute.resolution.replaceAll('_', ' ')}</Badge> : null}</div><p className="mt-2 text-sm leading-6 text-[var(--tradenest-text-secondary)]">{dispute.description}</p></div>{error ? <ErrorNotice message={error} /> : null}<div className="grid gap-6 lg:grid-cols-2"><Card className="p-5"><h3 className="font-semibold text-[var(--tradenest-navy)]">Conversation</h3><div className="mt-4 grid max-h-80 gap-3 overflow-auto">{dispute.messages.map((message) => <div key={message.id} className="rounded-xl bg-slate-50 p-3"><p className="text-sm">{message.body}</p><p className="mt-1 text-xs text-[var(--tradenest-text-secondary)]">{new Date(message.createdAt).toLocaleString()}</p></div>)}{!dispute.messages.length ? <p className="text-sm text-[var(--tradenest-text-secondary)]">No messages yet.</p> : null}</div>{dispute.status === 'OPEN' ? <MessageForm id={dispute.id} refresh={() => void load()} /> : null}</Card><Card className="p-5"><h3 className="font-semibold text-[var(--tradenest-navy)]">Evidence</h3><div className="mt-4 grid gap-3">{dispute.evidence.map((item) => <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="rounded-xl border border-[var(--tradenest-border)] p-3 text-sm font-medium text-[var(--tradenest-blue)] hover:bg-slate-50">{item.fileName || item.objectKey}</a>)}{!dispute.evidence.length ? <p className="text-sm text-[var(--tradenest-text-secondary)]">No evidence uploaded.</p> : null}</div>{dispute.status === 'OPEN' ? <EvidenceForm id={dispute.id} refresh={() => void load()} /> : null}</Card></div></div>;
 }

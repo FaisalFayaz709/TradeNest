@@ -21,16 +21,35 @@ export default function SellerProductsPage() { return <SellerShell title="Produc
 function Products() {
   const [products, setProducts] = useState<Product[]>([]); const [categories, setCategories] = useState<Category[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   async function load() { setLoading(true); setError(null); try { const [items, cats] = await Promise.all([allSellerProducts(), apiData<Category[]>('categories')]); setProducts(items); setCategories(cats); } catch (value) { setError(value instanceof Error ? value.message : 'Could not load seller products.'); } finally { setLoading(false); } }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    let active = true;
+
+    void Promise.all([allSellerProducts(), apiData<Category[]>('categories')])
+      .then(([items, cats]) => {
+        if (!active) return;
+        setProducts(items);
+        setCategories(cats);
+      })
+      .catch((value: unknown) => {
+        if (active) setError(value instanceof Error ? value.message : 'Could not load seller products.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
   if (loading) return <LoadingState label="Loading seller products…" />;
   return <div className="grid gap-6">{error ? <ErrorNotice message={error} /> : null}<CreateProduct categories={categories} onCreated={() => void load()} /><div className="grid gap-4">{products.length ? products.map((product) => <ProductRow key={product.id} product={product} categories={categories} refresh={() => void load()} />) : <Card className="p-8 text-center text-sm text-[var(--tradenest-text-secondary)]">No products yet. Create your first DRAFT above.</Card>}</div></div>;
 }
 
 function CreateProduct({ categories, onCreated }: { categories: Category[]; onCreated: () => void }) {
   const [form, setForm] = useState({ name: '', description: '', categoryId: categories[0]?.id || '', price: '', stock: '0', sku: '' }); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (!form.categoryId && categories[0]) setForm((value) => ({ ...value, categoryId: categories[0]!.id })); }, [categories, form.categoryId]);
-  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); setError(null); try { await jsonData<Product>('products', 'POST', { name: form.name, description: form.description, categoryId: form.categoryId, price: Number(form.price), stock: Number(form.stock), sku: form.sku }); setForm({ name: '', description: '', categoryId: categories[0]?.id || '', price: '', stock: '0', sku: '' }); onCreated(); } catch (value) { setError(value instanceof Error ? value.message : 'Could not create product.'); } finally { setBusy(false); } }
-  return <Card className="p-6"><div className="flex items-center gap-2"><PackagePlus className="size-5 text-[var(--tradenest-teal)]" /><h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Create product draft</h2></div><form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2"><label className="grid gap-1.5 text-sm font-medium">Name<Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} minLength={3} maxLength={200} required /></label><label className="grid gap-1.5 text-sm font-medium">SKU<Input value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} maxLength={100} required /></label><label className="grid gap-1.5 text-sm font-medium">Category<select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })} className="h-10 rounded-[var(--tradenest-radius-control)] border border-[var(--tradenest-border)] bg-white px-3 text-sm" required>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><div className="grid grid-cols-2 gap-3"><label className="grid gap-1.5 text-sm font-medium">Price<Input type="number" step="0.01" min="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} required /></label><label className="grid gap-1.5 text-sm font-medium">Opening stock<Input type="number" min="0" max="1000000" value={form.stock} onChange={(event) => setForm({ ...form, stock: event.target.value })} required /></label></div><label className="grid gap-1.5 text-sm font-medium md:col-span-2">Description<Textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} minLength={20} maxLength={5000} required /></label>{error ? <div className="md:col-span-2"><ErrorNotice message={error} /></div> : null}<div className="md:col-span-2"><Button type="submit" disabled={busy || !categories.length}>{busy ? 'Creating…' : 'Create DRAFT'}</Button></div></form></Card>;
+  const effectiveCategoryId = form.categoryId || categories[0]?.id || '';
+  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); setError(null); try { await jsonData<Product>('products', 'POST', { name: form.name, description: form.description, categoryId: effectiveCategoryId, price: Number(form.price), stock: Number(form.stock), sku: form.sku }); setForm({ name: '', description: '', categoryId: categories[0]?.id || '', price: '', stock: '0', sku: '' }); onCreated(); } catch (value) { setError(value instanceof Error ? value.message : 'Could not create product.'); } finally { setBusy(false); } }
+  return <Card className="p-6"><div className="flex items-center gap-2"><PackagePlus className="size-5 text-[var(--tradenest-teal)]" /><h2 className="text-lg font-semibold text-[var(--tradenest-navy)]">Create product draft</h2></div><form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2"><label className="grid gap-1.5 text-sm font-medium">Name<Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} minLength={3} maxLength={200} required /></label><label className="grid gap-1.5 text-sm font-medium">SKU<Input value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} maxLength={100} required /></label><label className="grid gap-1.5 text-sm font-medium">Category<select value={effectiveCategoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })} className="h-10 rounded-[var(--tradenest-radius-control)] border border-[var(--tradenest-border)] bg-white px-3 text-sm" required>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><div className="grid grid-cols-2 gap-3"><label className="grid gap-1.5 text-sm font-medium">Price<Input type="number" step="0.01" min="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} required /></label><label className="grid gap-1.5 text-sm font-medium">Opening stock<Input type="number" min="0" max="1000000" value={form.stock} onChange={(event) => setForm({ ...form, stock: event.target.value })} required /></label></div><label className="grid gap-1.5 text-sm font-medium md:col-span-2">Description<Textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} minLength={20} maxLength={5000} required /></label>{error ? <div className="md:col-span-2"><ErrorNotice message={error} /></div> : null}<div className="md:col-span-2"><Button type="submit" disabled={busy || !categories.length}>{busy ? 'Creating…' : 'Create DRAFT'}</Button></div></form></Card>;
 }
 
 function ProductRow({ product, categories, refresh }: { product: Product; categories: Category[]; refresh: () => void }) {

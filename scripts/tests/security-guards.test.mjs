@@ -61,7 +61,7 @@ test('all cookie-session mutation routes reject cross-origin requests before con
   }
 });
 test('E2E helper cannot be enabled in production or bridge to a non-loopback API', () => {
-  const text = source('apps/web/app/api/__e2e/session/route.ts');
+  const text = source('apps/web/app/api/%5F_e2e/session/route.ts');
   assert.match(text, /process\.env\.NODE_ENV === 'production'/);
   assert.match(text, /base\.protocol === 'http:' && \['localhost', '127\.0\.0\.1', '\[::1\]'\]/);
 });

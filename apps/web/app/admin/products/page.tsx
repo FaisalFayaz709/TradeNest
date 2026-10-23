@@ -6,7 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { LoadingState } from '@/components/loading-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { TableScroll } from '@/components/table-scroll';
 import { apiCollection, jsonData } from '@/lib/api-client';
 import { moderateResource } from '@/lib/admin-moderation';
 import type { Product } from '@/lib/api-types';
@@ -20,7 +20,28 @@ export default function AdminProductsPage() {
     try { setRows((await apiCollection<Product>('admin/products?page=1&limit=100')).data); }
     catch (error) { setError(error instanceof Error ? error.message : 'Could not load products.'); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+
+    void apiCollection<Product>('admin/products?page=1&limit=100')
+      .then((response) => {
+        if (!active) return;
+        setRows(response.data);
+      })
+      .catch((value: unknown) => {
+        if (!active) return;
+        setError(
+          value instanceof Error
+            ? value.message
+            : 'Could not load products.'
+        );
+        setRows([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
   async function moderate(product: Product, action: 'suspend' | 'reactivate') {
     setError(null); setBusy(product.id);
     try {
@@ -38,7 +59,7 @@ export default function AdminProductsPage() {
   }
   return <AdminShell title="Products" description="Moderate product visibility using audited, state-specific commands without deleting order history.">
     {error && <ErrorNotice message={error}/>}
-    {!rows ? <LoadingState label="Loading products…"/> : <Card className="overflow-x-auto">
+    {!rows ? <LoadingState label="Loading products…"/> : <TableScroll label="Products moderation table">
       <table className="w-full min-w-[950px] text-left text-sm"><thead className="border-b bg-slate-50 text-xs uppercase"><tr><th className="p-4">Product</th><th className="p-4">Status</th><th className="p-4">Price</th><th className="p-4">Stock</th><th className="p-4">Seller</th><th className="p-4">Actions</th></tr></thead>
       <tbody>{rows.map(product => <tr key={product.id} className="border-b last:border-0">
         <td className="p-4"><p className="font-medium">{product.name}</p><p className="text-xs text-slate-500">{product.sku}</p></td>
@@ -52,6 +73,6 @@ export default function AdminProductsPage() {
           <Button variant="ghost" size="sm" disabled={busy === product.id} onClick={() => void remove(product.id)}>Delete</Button>
         </div></td>
       </tr>)}</tbody></table>
-    </Card>}
+    </TableScroll>}
   </AdminShell>;
 }

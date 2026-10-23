@@ -19,6 +19,18 @@
   --tradenest-warning: #f59e0b;
   --tradenest-danger: #dc2626;
 
+  /* Readable interface counterparts; preserve the exact blueprint brand swatches. */
+  --tradenest-teal-ink: #076d70;
+  --tradenest-teal-action: #087575;
+  --tradenest-teal-hover: #065c5e;
+  --tradenest-gold-ink: #7b530c;
+  --tradenest-success-ink: #116932;
+  --tradenest-warning-ink: #92400e;
+  --tradenest-danger-ink: #b91c1c;
+  --tradenest-focus: #087575;
+  --tradenest-placeholder: #64748b;
+  --tradenest-border-strong: #7b8796;
+
   --tradenest-radius-control: 10px;
   --tradenest-radius-card: 16px;
   --tradenest-radius-modal: 20px;
@@ -32,12 +44,15 @@ html,
 body {
   margin: 0;
   min-height: 100%;
+  min-width: 0;
 }
 
 body {
   background: var(--tradenest-background);
   color: var(--tradenest-text);
   font-family: "Inter", Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
@@ -55,6 +70,18 @@ select {
 
 a {
   text-underline-offset: 3px;
+}
+
+/* Links without component-level rings still need a visible keyboard focus. */
+a[href]:focus-visible {
+  outline: 2px solid var(--tradenest-focus);
+  outline-offset: 3px;
+}
+
+/* Use the restrained brand teal for native checked controls. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--tradenest-teal-ink);
 }
 
 button:not(:disabled),

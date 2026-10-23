@@ -30,12 +30,29 @@ export class RefundReconciliationService implements OnModuleInit, OnModuleDestro
   ) {}
 
   onModuleInit() {
-    if (process.env.REFUND_RECONCILIATION_ENABLED === 'false' || process.env.NODE_ENV === 'test') return;
+    if (process.env.REFUND_RECONCILIATION_ENABLED === 'false') return;
+    // Regular Jest/test processes must never dispatch refunds. The browser
+    // acceptance suite opts in only for its localhost sandbox E2E database.
+    if (process.env.NODE_ENV === 'test' && !this.isIsolatedSandboxE2E()) return;
     this.timer = setInterval(() => { void this.scheduled(); }, 15_000);
     this.timer.unref?.();
     void this.scheduled();
   }
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
+
+  private isIsolatedSandboxE2E(): boolean {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (process.env.TRADENEST_E2E_REFUND_WORKER !== '1' ||
+      process.env.PAYMENT_PROVIDER !== 'sandbox' ||
+      !databaseUrl || databaseUrl !== process.env.E2E_DATABASE_URL) return false;
+    try {
+      const parsed = new URL(databaseUrl);
+      const name = decodeURIComponent(parsed.pathname.slice(1)).toLowerCase();
+      return (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') &&
+        /(^|[_-])(e2e|test)([_-]|$)/.test(name);
+    } catch { return false; }
+  }
+
   private async scheduled() {
     if (this.running) return;
     this.running = true;

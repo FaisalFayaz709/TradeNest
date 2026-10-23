@@ -33,6 +33,38 @@ function validBody(value: unknown): value is RequestBody {
     && candidate.password.length > 0;
 }
 
+type E2ESession = {
+  tokens: { accessToken: string };
+  user: { email: string; role: Role };
+};
+
+function parseE2ESession(value: unknown): E2ESession | null {
+  if (!value || typeof value !== 'object' || !('data' in value)) return null;
+
+  const data = value.data;
+  if (!data || typeof data !== 'object' || !('tokens' in data) || !('user' in data)) {
+    return null;
+  }
+
+  const { tokens, user } = data;
+
+  if (!tokens || typeof tokens !== 'object' || !('accessToken' in tokens)
+      || typeof tokens.accessToken !== 'string' || !tokens.accessToken) {
+    return null;
+  }
+
+  if (!user || typeof user !== 'object' || !('email' in user)
+      || typeof user.email !== 'string' || !('role' in user)
+      || (user.role !== 'BUYER' && user.role !== 'SELLER' && user.role !== 'ADMIN')) {
+    return null;
+  }
+
+  return {
+    tokens: { accessToken: tokens.accessToken },
+    user: { email: user.email, role: user.role },
+  };
+}
+
 export async function POST(request: Request): Promise<Response> {
   if (!enabled()) return Response.json({ error: 'Not found.' }, { status: 404 });
 
@@ -51,10 +83,10 @@ export async function POST(request: Request): Promise<Response> {
     body: JSON.stringify({ email: body.email, password: body.password }),
     cache: 'no-store',
   });
-  const loginPayload = await login.json() as any;
+  const loginPayload: unknown = await login.json();
   if (!login.ok) return Response.json({ error: 'NestJS login failed.', upstream: loginPayload }, { status: login.status });
 
-  const session = loginPayload?.data;
+  const session = parseE2ESession(loginPayload);
   if (!session?.tokens?.accessToken || session?.user?.role !== body.role) {
     return Response.json({ error: 'Seeded role does not match the requested E2E role.' }, { status: 409 });
   }

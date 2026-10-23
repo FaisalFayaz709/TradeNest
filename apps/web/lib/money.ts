@@ -1,6 +1,6 @@
 function minorUnits(amount: string): bigint {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(amount.trim());
-  if (!match) return 0n;
+  if (!match || match[1] === undefined) return 0n;
   const fraction = (match[2] || '').padEnd(2, '0');
   return BigInt(match[1]) * 100n + BigInt(fraction || '0');
 }

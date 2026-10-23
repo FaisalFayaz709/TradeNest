@@ -107,8 +107,11 @@ test('browser payment history is scoped to a buyer, not shared device-wide', () 
 
 test('product cards prevent duplicate buyer actions and expose accessible feedback', () => {
   const product = source('apps/web/components/product-card.tsx');
+  assert.match(product, /const inStock = product\.availableQuantity > 0;/);
+  assert.match(product, /if \(busy \|\| !inStock\) return;/);
   assert.match(product, /if \(busy\) return;/);
-  assert.match(product, /disabled=\{busy \|\| product\.availableQuantity < 1\}/);
+  assert.match(product, /disabled=\{busy \|\| !inStock\}/);
+  assert.match(product, /disabled=\{busy\}/);
   assert.match(product, /role="status"/);
 });
 

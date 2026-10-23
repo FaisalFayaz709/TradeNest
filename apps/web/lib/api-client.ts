@@ -5,7 +5,7 @@ export class TradeNestApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly details: Record<string, unknown>;
-  readonly requestId?: string;
+  readonly requestId: string | undefined;
 
   constructor(status: number, payload: ApiErrorShape, fallback: string) {
     super(payload.error?.message || fallback);
@@ -67,7 +67,7 @@ export async function apiCollection<T>(path: string): Promise<ApiCollection<T>> 
 export async function jsonData<T>(path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown, headers?: HeadersInit): Promise<T> {
   return apiData<T>(path, {
     method,
-    headers,
+    ...(headers === undefined ? {} : { headers }),
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }

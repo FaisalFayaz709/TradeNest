@@ -16,7 +16,29 @@ export default function SellerSettingsPage() { return <SellerShell title="Settin
 function Settings() {
   const [profile, setProfile] = useState<SellerProfile | null>(null); const [user, setUser] = useState<UserProfile | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   async function load() { setLoading(true); setError(null); try { const [seller, identity] = await Promise.all([apiData<SellerProfile>('seller/profile'), apiData<UserProfile>('users/me')]); setProfile(seller); setUser(identity); } catch (value) { setError(value instanceof Error ? value.message : 'Could not load settings.'); } finally { setLoading(false); } }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    let active = true;
+
+    void Promise.all([
+      apiData<SellerProfile>('seller/profile'),
+      apiData<UserProfile>('users/me'),
+    ])
+      .then(([seller, identity]) => {
+        if (!active) return;
+        setProfile(seller);
+        setUser(identity);
+      })
+      .catch((value: unknown) => {
+        if (active) setError(value instanceof Error ? value.message : 'Could not load settings.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
   if (loading) return <LoadingState label="Loading seller settings…" />; if (error && !profile) return <ErrorNotice message={error} />; if (!profile || !user) return null;
   return <div className="grid gap-6 lg:grid-cols-2"><ProfileForm profile={profile} refresh={() => void load()} /><PasswordForm /><Card className="p-5 lg:col-span-2"><div className="flex items-center gap-2"><UserRound className="size-5 text-[var(--tradenest-teal)]" /><h2 className="font-semibold text-[var(--tradenest-navy)]">Account identity</h2><Badge tone={user.status === 'ACTIVE' ? 'success' : 'warning'}>{user.status}</Badge></div><dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-xs text-[var(--tradenest-text-secondary)]">Name</dt><dd className="mt-1 font-medium">{user.name}</dd></div><div><dt className="text-xs text-[var(--tradenest-text-secondary)]">Email</dt><dd className="mt-1 font-medium">{user.email}</dd></div><div><dt className="text-xs text-[var(--tradenest-text-secondary)]">Role</dt><dd className="mt-1 font-medium">{user.role}</dd></div><div><dt className="text-xs text-[var(--tradenest-text-secondary)]">Store slug</dt><dd className="mt-1 font-medium">{profile.slug}</dd></div></dl><p className="mt-4 text-xs text-[var(--tradenest-text-secondary)]">The seller slug is backend-derived and remains stable when the display store name changes.</p></Card></div>;
 }

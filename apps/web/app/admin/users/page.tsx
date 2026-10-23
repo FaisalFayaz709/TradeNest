@@ -6,7 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { LoadingState } from '@/components/loading-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { TableScroll } from '@/components/table-scroll';
 import { apiCollection } from '@/lib/api-client';
 import { moderateResource } from '@/lib/admin-moderation';
 import type { UserProfile } from '@/lib/api-types';
@@ -19,7 +19,29 @@ export default function AdminUsersPage() {
     try { setRows((await apiCollection<UserProfile>('admin/users?page=1&limit=100')).data); }
     catch (error) { setError(error instanceof Error ? error.message : 'Could not load users.'); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+
+    void apiCollection<UserProfile>('admin/users?page=1&limit=100')
+      .then((response) => {
+        if (!active) return;
+        setRows(response.data);
+        setError(null);
+      })
+      .catch((value: unknown) => {
+        if (!active) return;
+        setError(
+          value instanceof Error
+            ? value.message
+            : 'Could not load users.'
+        );
+        setRows([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
   async function moderate(user: UserProfile, action: 'suspend' | 'reactivate') {
     setError(null); setBusy(user.id);
     try {
@@ -31,7 +53,7 @@ export default function AdminUsersPage() {
   return <AdminShell title="Users" description="Manage accounts with explicit, audited suspension and reactivation. Administrator accounts cannot be moderated here.">
     {error && <ErrorNotice message={error}/>}
     {!rows ? <LoadingState label="Loading users…"/> :
-      <Card className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-sm">
+      <TableScroll label="Users moderation table"><table className="w-full min-w-[850px] text-left text-sm">
         <thead className="border-b bg-slate-50 text-xs uppercase"><tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Status</th><th className="p-4">Verified</th><th className="p-4">Actions</th></tr></thead>
         <tbody>{rows.map(user => <tr key={user.id} className="border-b last:border-0">
           <td className="p-4"><p className="font-medium">{user.name}</p><p className="text-xs text-slate-500">{user.email}</p></td>
@@ -41,6 +63,6 @@ export default function AdminUsersPage() {
           <td className="p-4">{user.role !== 'ADMIN' && user.status === 'ACTIVE' && <Button size="sm" variant="danger" disabled={busy === user.id} onClick={() => void moderate(user, 'suspend')}>Suspend</Button>}
             {user.role !== 'ADMIN' && user.status === 'SUSPENDED' && <Button size="sm" variant="outline" disabled={busy === user.id} onClick={() => void moderate(user, 'reactivate')}>Reactivate</Button>}</td>
         </tr>)}</tbody>
-      </table></Card>}
+      </table></TableScroll>}
   </AdminShell>;
 }
