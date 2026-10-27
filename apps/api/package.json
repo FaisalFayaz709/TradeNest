@@ -9,6 +9,7 @@
     "start": "node dist/main.js",
     "prestart:dev": "pnpm db:generate && pnpm --filter @tradenest/config build && pnpm --filter @tradenest/contracts build",
     "start:dev": "nest start --watch",
+    "dev": "pnpm run prestart:dev && pnpm exec nest start --watch",
     "lint": "eslint \"src/**/*.ts\"",
     "pretypecheck": "pnpm db:generate && pnpm --filter @tradenest/config build && pnpm --filter @tradenest/contracts build",
     "typecheck": "tsc --noEmit -p tsconfig.json",

@@ -7,6 +7,8 @@
     "node": ">=24.0.0 <25"
   },
   "scripts": {
+    "dev": "node scripts/dev-all.mjs",
+    "dev:ai": "node scripts/dev-all.mjs --ai-only",
     "dev:web": "pnpm --filter @tradenest/web dev",
     "dev:api": "pnpm --filter @tradenest/api start:dev",
     "build": "pnpm -r --if-present build",
