@@ -9,3 +9,6 @@ onlyBuiltDependencies:
   - esbuild
   - prisma
   - unrs-resolver
+
+overrides:
+  "@nestjs/platform-express>multer": "2.5.0"
